@@ -4,12 +4,15 @@
 このドキュメントでは、実装に向けた技術構成とアーキテクチャの初期方針を整理します。
 
 ## システム構成
-- **フロントエンド**: 現在は未定（将来的には Web / モバイルなど複数クライアントからの呼び出しを想定）
+- **フロントエンド**: Hono JSX による SSR（MVP）+ 外部 JavaScript による動的処理
 - **API 層**: Cloudflare Workers 上にデプロイされた Hono アプリケーション
   - リクエストルーターとバリデーション
   - 提案ロジックを呼び出すサービス層
-- **ストレージ**: Cloudflare D1（SQLite ベース）
-  - MVP では D1 をメインデータストアとし、アイデアや提案履歴を保持
+- **認証**: GitHub OAuth + パスワード認証のハイブリッド
+  - JWT によるステートレス認証（Cookie に保存）
+- **ストレージ**: Cloudflare D1（SQLite ベース）+ Workers KV
+  - **プライマリストレージ**: D1 にユーザー、アイデア、提案履歴を保存
+  - **クールダウン管理**: Workers KV で期限付きデータ管理（7日間 TTL）
 
 ## リクエストフロー
 1. クライアントが Worker のエンドポイントへ HTTP リクエストを送信
@@ -32,15 +35,33 @@ sequenceDiagram
     Worker-->>Client: JSON (idea, message, metadata)
 ```
 
-## 想定エンドポイント
-- `POST /api/suggestions`
-  - ボディ: `{ "mood": "low_energy", "includeTags": ["indoor"], "excludeIds": ["idea_123"] }`
-  - レスポンス: `{ "idea": {...}, "motivationalMessage": "...", "servedAt": "2024-..." }`
-- `POST /api/ideas`
-  - ボディ: `{ "title": "...", "tags": ["indoor"], "note": "..." }`
-  - 役割: ユーザーが事前に「やりたいこと」を登録する（MVP 時点で管理 UI が無くても API 経由で登録可能にしておく）
-- `GET /api/ideas`
-  - 登録済みアイデアの取得。将来的な管理 UI のための下準備。
+## 主要エンドポイント
+
+### 認証関連
+- `GET /` - ログインページ（未認証の場合）/ ダッシュボードへリダイレクト（認証済み）
+- `POST /api/auth/signup` - メールアドレスとパスワードでサインアップ
+- `POST /api/auth/login` - メールアドレスとパスワードでログイン
+- `GET /api/auth/github` - GitHub OAuth フロー開始
+- `GET /api/auth/github/callback` - GitHub OAuth コールバック
+- `POST /api/auth/logout` - ログアウト
+
+### ダッシュボード
+- `GET /dashboard` - ユーザーダッシュボード（認証必須）
+- `POST /api/user/password` - パスワード設定/変更（GitHub 認証ユーザー含む）
+
+### アイデア管理（未実装）
+- `GET /api/ideas` - 登録済みアイデアの一覧取得
+- `POST /api/ideas` - 新しいアイデアの登録
+- `PUT /api/ideas/:id` - アイデアの更新
+- `DELETE /api/ideas/:id` - アイデアの削除
+
+### 提案機能（未実装）
+- `POST /api/suggestions` - コンテキストに基づいた提案を取得
+  - ボディ: `{ "mood": "low_energy", "availableMinutes": 60, "includeTags": ["indoor"] }`
+  - レスポンス: `{ "idea": {...}, "motivationalMessage": "...", "servedAt": "2025-..." }`
+
+### 静的ファイル配信
+- `GET /static/:filename` - JavaScript ファイルの配信（login.js, dashboard.js など）
 
 ※ 実際のエンドポイント構成は実装フェーズで調整予定。
 
@@ -54,6 +75,33 @@ sequenceDiagram
 - 出力: 選定したアイデアと後押しメッセージ
 
 ## ローカル開発
+
+### 環境変数の設定
+
+**重要**: ローカル開発用の環境変数を設定する必要があります。
+
+1. `.dev.vars.example` をコピーして `.dev.vars` を作成
+   ```bash
+   cp .dev.vars.example .dev.vars
+   ```
+
+2. `.dev.vars` に実際の値を設定
+   ```bash
+   # GitHub OAuth アプリケーションを作成: https://github.com/settings/developers
+   GITHUB_CLIENT_ID=your_github_client_id
+   GITHUB_CLIENT_SECRET=your_github_client_secret
+
+   # JWT シークレットを生成（32バイト以上のランダム文字列）
+   JWT_SECRET=$(openssl rand -base64 32)
+   ```
+
+3. **⚠️ セキュリティ注意事項**:
+   - `.dev.vars` は絶対に Git にコミットしないでください（`.gitignore` に含まれています）
+   - 本番環境では `wrangler secret put` コマンドを使用してシークレットを設定してください
+   - GitHub Client Secret は定期的にローテーションすることを推奨します
+
+### 開発手順
+
 1. 依存関係をインストール
    ```bash
    npm install
@@ -94,12 +142,39 @@ sequenceDiagram
 
 ## 開発ロードマップ（抜粋）
 - [x] Hono プロジェクトの初期セットアップ
-- [ ] `POST /api/suggestions` の仮実装（ダミーデータ返却）
-- [ ] ストレージアクセスレイヤと CRUD API の整備
-- [ ] 提案アルゴリズムの MVP 版実装（クールダウンを含む）
+- [x] 認証システムの実装（GitHub OAuth + パスワード認証）
+- [x] ユーザー管理とダッシュボードの基本実装
+- [ ] アイデア管理 CRUD API の実装
+- [ ] `POST /api/suggestions` の実装（提案アルゴリズム MVP 版）
+- [ ] クールダウン機能の実装（Workers KV 使用）
 - [ ] ロギング/監視の初期設計（Cloudflare Logs, Sentry 等の検討）
 
 ## 運用メモ
 - 環境変数は Cloudflare Worker のシークレット（`wrangler secret`）で管理
 - ローカル開発は `wrangler dev` を利用し、Hono のテストは Vitest などで補完予定
 - デプロイは `wrangler deploy` による CI/CD パイプライン化を視野に入れる
+
+## セキュリティ
+
+セキュリティに関する情報は [SECURITY.md](./SECURITY.md) をご覧ください。
+
+脆弱性を発見した場合は、公開の Issue ではなく、メンテナに直接ご連絡ください。
+
+## ライセンス
+
+このプロジェクトは MIT ライセンスの下で公開されています。詳細は [LICENSE](./LICENSE) ファイルをご覧ください。
+
+## コントリビューション
+
+コントリビューションを歓迎します！バグ報告、機能リクエスト、プルリクエストなど、お気軽にご参加ください。
+
+### 開発ガイドライン
+
+- [CLAUDE.md](./CLAUDE.md): Claude Code を使った開発ガイド
+- [AGENTS.md](./AGENTS.md): 仮想エージェントチームの役割と連携
+
+### コーディング規約
+
+- Biome による Lint とフォーマット
+- コミット前に `npm run format` と `npm run lint` を実行
+- TypeScript strict モード有効

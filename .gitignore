@@ -15,6 +15,8 @@ build/
 # Environment variables
 .env
 .env.*
+.dev.vars
+.dev.vars.local
 
 # TypeScript
 *.tsbuildinfo
@@ -30,4 +32,13 @@ build/
 .idea/
 .vscode/
 .claude/
-.dev.vars
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Database files (local development)
+*.sqlite
+*.db
+.wrangler/
