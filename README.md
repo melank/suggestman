@@ -1,6 +1,6 @@
 # Suggestman
 
-自由時間が突然生まれた瞬間に、「本当にやりたいこと」を提示してくれるサジェスト専用の Cloudflare Worker アプリケーションです。  
+自由時間が突然生まれた瞬間に、「本当にやりたいこと」を提示してくれるサジェスト専用の Cloudflare Worker アプリケーションです。
 このドキュメントでは、実装に向けた技術構成とアーキテクチャの初期方針を整理します。
 
 ## システム構成
@@ -54,20 +54,20 @@ sequenceDiagram
 - 出力: 選定したアイデアと後押しメッセージ
 
 ## ローカル開発
-1. 依存関係をインストール  
+1. 依存関係をインストール
    ```bash
    npm install
    ```
-2. 開発サーバーを起動  
+2. 開発サーバーを起動
    ```bash
    npm run dev
    ```
-3. 別ターミナルまたはブラウザから確認  
+3. 別ターミナルまたはブラウザから確認
    ```bash
    curl http://127.0.0.1:8787/
    # => {"message":"Hello, Suggestman!","timestamp":"..."}
    ```
-4. D1 へ疎通確認  
+4. D1 へ疎通確認
    ```bash
    curl http://127.0.0.1:8787/ideas
    # => {"ideas":[]}
@@ -77,19 +77,19 @@ sequenceDiagram
 - `.nvmrc` で Node.js 20 系を指定しています。`nvm use` または `nvm install` で環境を揃えてから `npm install` を実行してください。
 
 ### Cloudflare D1 セットアップ
-1. データベース作成（初回のみ）  
+1. データベース作成（初回のみ）
    ```bash
-   npx wrangler d1 create suggestman-db
+   npx wrangler d1 create suggestman
    ```
    表示された `database_id` を `wrangler.toml` の `[[d1_databases]]` セクションへ反映してください。
-2. マイグレーション適用  
+2. マイグレーション適用
    ```bash
-   npx wrangler d1 migrations apply suggestman-db --local
+   npx wrangler d1 migrations apply suggestman --local
    # 本番は --local を外して実行
    ```
-3. 手動クエリ例  
+3. 手動クエリ例
    ```bash
-   npx wrangler d1 execute suggestman-db --local --command "SELECT * FROM ideas;"
+   npx wrangler d1 execute suggestman --local --command "SELECT * FROM ideas;"
    ```
 
 ## 開発ロードマップ（抜粋）

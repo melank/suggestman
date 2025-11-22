@@ -8,6 +8,6 @@ port = 8787
 
 [[d1_databases]]
 binding = "DB"
-database_name = "suggestman-db"
-# デプロイ前に `wrangler d1 create suggestman-db` で取得した ID に置き換えること
+database_name = "suggestman"
+# デプロイ前に `wrangler d1 create suggestman` で取得した ID に置き換えること
 database_id = "00000000-0000-0000-0000-000000000000"

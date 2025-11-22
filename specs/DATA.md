@@ -360,8 +360,8 @@ KV にはマイグレーション機能がないため、以下の戦略を採�
 Wrangler の標準マイグレーション機能を使用：
 
 ```bash
-npx wrangler d1 migrations create suggestman-db add_new_column
-npx wrangler d1 migrations apply suggestman-db --local
+npx wrangler d1 migrations create suggestman add_new_column
+npx wrangler d1 migrations apply suggestman --local
 ```
 
 ---

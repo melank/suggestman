@@ -14,7 +14,7 @@ Suggestman は、自由時間が突然生まれた瞬間に「本当にやりた
 - **Database**: Cloudflare D1 (SQLite)
 - **Language**: TypeScript
 - **Linter/Formatter**: Biome
-- **Node.js**: v20 (`.nvmrc` で管理)
+- **Node.js**: v22 (`.nvmrc` で管理)
 
 ## アーキテクチャ
 
@@ -29,14 +29,13 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - **ストレージ層**: D1 によるアイデア管理、提案履歴
 
 ### エンドポイント設計
-- `POST /api/suggestions`: コンテキストに基づいた提案を取得
-- `POST /api/ideas`: 新しいアイデアを登録
-- `GET /api/ideas`: 登録済みアイデア一覧を取得
+
+未検討
 
 ## 開発環境
 
 ### セットアップ手順
-1. Node.js 20 環境の準備
+1. Node.js 環境の準備
    ```bash
    nvm use
    npm install
@@ -44,9 +43,9 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 
 2. D1 データベースの初期化
    ```bash
-   npx wrangler d1 create suggestman-db
+   npx wrangler d1 create suggestman
    # database_id を wrangler.toml に反映
-   npx wrangler d1 migrations apply suggestman-db --local
+   npx wrangler d1 migrations apply suggestman --local
    ```
 
 3. 開発サーバーの起動
@@ -148,13 +147,13 @@ src/
 
 ### データベーススキーマの変更
 1. マイグレーションファイルを作成 (`migrations/` 配下)
-2. ローカルで適用: `npx wrangler d1 migrations apply suggestman-db --local`
+2. ローカルで適用: `npx wrangler d1 migrations apply suggestman --local`
 3. 動作確認
-4. 本番適用: `npx wrangler d1 migrations apply suggestman-db`
+4. 本番適用: `npx wrangler d1 migrations apply suggestman`
 
 ### デバッグ
 - `console.log` は Wrangler のコンソールに出力される
-- D1 のクエリ確認: `npx wrangler d1 execute suggestman-db --local --command "SELECT ..."`
+- D1 のクエリ確認: `npx wrangler d1 execute suggestman --local --command "SELECT ..."`
 
 ## MVP の重要ポイント
 
