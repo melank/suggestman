@@ -2,6 +2,11 @@ import {Hono} from "hono";
 import type {Bindings} from "../types/bindings";
 import {getGitHubAccessToken, getGitHubUser} from "../lib/github";
 import {generateAccessToken} from "../lib/jwt";
+import {
+  hashPassword,
+  verifyPassword,
+  validatePasswordStrength,
+} from "../lib/password";
 
 const app = new Hono<{Bindings: Bindings}>();
 
@@ -86,6 +91,199 @@ app.get("/github/callback", async (c) => {
       {error: "Authentication failed", details: String(error)},
       500
     );
+  }
+});
+
+// メールアドレス/パスワードでサインアップ
+app.post("/signup", async (c) => {
+  try {
+    const body = await c.req.json<{
+      email: string;
+      password: string;
+      name: string;
+    }>();
+
+    const {email, password, name} = body;
+
+    // バリデーション
+    if (!email || !password || !name) {
+      return c.json({error: "メールアドレス、パスワード、名前は必須です"}, 400);
+    }
+
+    // パスワード強度チェック
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      return c.json({error: passwordValidation.errors.join(", ")}, 400);
+    }
+
+    // 既存ユーザーチェック
+    const existingUser = await c.env.DB.prepare(
+      "SELECT * FROM users WHERE email = ?"
+    )
+      .bind(email)
+      .first();
+
+    if (existingUser) {
+      return c.json({error: "このメールアドレスは既に登録されています"}, 409);
+    }
+
+    // パスワードをハッシュ化
+    const passwordHash = await hashPassword(password);
+
+    // ユーザーを作成
+    const userId = crypto.randomUUID();
+    await c.env.DB.prepare(
+      "INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)"
+    )
+      .bind(userId, email, name, passwordHash)
+      .run();
+
+    // JWT トークンを生成
+    const token = await generateAccessToken(
+      {
+        id: userId,
+        email: email,
+        name: name,
+      },
+      c.env.JWT_SECRET
+    );
+
+    // トークンを Cookie に設定
+    c.header(
+      "Set-Cookie",
+      `token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600`
+    );
+
+    return c.json({success: true, redirect: "/dashboard"});
+  } catch (error) {
+    console.error("Signup error:", error);
+    return c.json({error: "サインアップに失敗しました"}, 500);
+  }
+});
+
+// メールアドレス/パスワードでログイン
+app.post("/login", async (c) => {
+  try {
+    const body = await c.req.json<{
+      email: string;
+      password: string;
+    }>();
+
+    const {email, password} = body;
+
+    // バリデーション
+    if (!email || !password) {
+      return c.json({error: "メールアドレスとパスワードは必須です"}, 400);
+    }
+
+    // ユーザーを取得
+    const user = await c.env.DB.prepare("SELECT * FROM users WHERE email = ?")
+      .bind(email)
+      .first();
+
+    if (!user) {
+      return c.json(
+        {error: "メールアドレスまたはパスワードが正しくありません"},
+        401
+      );
+    }
+
+    // password_hash が存在しない場合（GitHub OAuth のみのユーザー）
+    if (!user.password_hash) {
+      return c.json(
+        {error: "このアカウントは GitHub でログインしてください"},
+        401
+      );
+    }
+
+    // パスワードを検証
+    const isValid = await verifyPassword(
+      password,
+      user.password_hash as string
+    );
+    if (!isValid) {
+      return c.json(
+        {error: "メールアドレスまたはパスワードが正しくありません"},
+        401
+      );
+    }
+
+    // JWT トークンを生成
+    const token = await generateAccessToken(
+      {
+        id: user.id as string,
+        email: user.email as string,
+        name: user.name as string,
+      },
+      c.env.JWT_SECRET
+    );
+
+    // トークンを Cookie に設定
+    c.header(
+      "Set-Cookie",
+      `token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600`
+    );
+
+    return c.json({success: true, redirect: "/dashboard"});
+  } catch (error) {
+    console.error("Login error:", error);
+    return c.json({error: "ログインに失敗しました"}, 500);
+  }
+});
+
+// パスワード設定（GitHub OAuth ユーザー向け）
+app.post("/set-password", async (c) => {
+  try {
+    // Cookie から JWT トークンを取得
+    const cookieHeader = c.req.header("Cookie");
+    if (!cookieHeader) {
+      return c.json({error: "認証が必要です"}, 401);
+    }
+
+    const cookies = cookieHeader.split(";").reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split("=");
+      acc[key] = value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const token = cookies.token;
+    if (!token) {
+      return c.json({error: "認証が必要です"}, 401);
+    }
+
+    // JWT を検証してユーザー情報を取得
+    const {verifyJWT} = await import("../lib/jwt");
+    const payload = await verifyJWT(token, c.env.JWT_SECRET);
+
+    const body = await c.req.json<{
+      password: string;
+    }>();
+
+    const {password} = body;
+
+    // バリデーション
+    if (!password) {
+      return c.json({error: "パスワードは必須です"}, 400);
+    }
+
+    // パスワード強度チェック
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      return c.json({error: passwordValidation.errors.join(", ")}, 400);
+    }
+
+    // パスワードをハッシュ化
+    const passwordHash = await hashPassword(password);
+
+    // ユーザーのパスワードを更新
+    await c.env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+      .bind(passwordHash, payload.sub)
+      .run();
+
+    return c.json({success: true, message: "パスワードが設定されました"});
+  } catch (error) {
+    console.error("Set password error:", error);
+    return c.json({error: "パスワードの設定に失敗しました"}, 500);
   }
 });
 
