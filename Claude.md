@@ -72,6 +72,7 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - **index.ts はコンパクトに**: エントリポイントとして `app.route()` でのルートマウントのみを行う
 - **API ルートは機能ごとに分離**: `src/routes/` 配下に各リソース単位で Hono インスタンスを作成
 - **HTML/CSS は別ファイルに**: 画面ごとに `src/views/` 配下に HTML ファイルを作成
+- **JavaScript は外部ファイルに分離**: `src/routes/static.ts` で配信（詳細は後述）
 - **ビジネスロジックはサービス層に集約**: `src/services/` 配下に実装
 - **データアクセスロジックは独立したレイヤーとして管理**: リポジトリパターンを推奨
 - **型定義は共通化**: `src/types/` 配下で一元管理
@@ -109,22 +110,127 @@ app.route('/suggestions', suggestions)
 export default app
 ```
 
+#### JavaScript の外部ファイル分離パターン
+
+**重要**: Hono JSX では、`<script>` タグ内に JavaScript を直接記述することができません。
+
+##### なぜ外部ファイルが必要か
+
+Hono JSX の `<script>` タグ内では、以下の制約があります:
+
+1. **JSX パーサーの制約**: `{}` が JSX 式として解釈されるため、JavaScript のオブジェクトや関数が正しく解釈されない
+2. **エスケープ問題**: `</script>` タグがテンプレート内に現れると、パーサーが混乱する
+3. **セキュリティ**: インライン JavaScript は CSP (Content Security Policy) に違反する可能性がある
+
+##### 実装パターン
+
+**ステップ 1**: `src/routes/static.ts` に JavaScript ファイルを提供するエンドポイントを追加
+
+```typescript
+// src/routes/static.ts
+import {Hono} from "hono";
+
+const app = new Hono();
+
+// 新しい JavaScript ファイルを追加する場合
+app.get("/your-page.js", (c) => {
+  const js = `
+    function yourFunction() {
+      // JavaScript コードをここに記述
+      console.log('Hello from external JS');
+    }
+
+    // イベントハンドラなど
+    async function handleSubmit(e) {
+      e.preventDefault();
+      // 処理...
+    }
+  `;
+
+  return c.text(js, 200, {
+    "Content-Type": "application/javascript",
+    "Cache-Control": "public, max-age=3600",
+  });
+});
+
+export default app;
+```
+
+**ステップ 2**: HTML ビュー (`src/views/`) でスクリプトを参照
+
+```tsx
+// src/views/your-page.tsx
+import type {FC} from "hono/jsx";
+
+export const YourPage: FC = () => {
+  return (
+    <html lang="ja">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Your Page</title>
+        {/* 外部 JavaScript ファイルを参照 */}
+        <script src="/static/your-page.js"></script>
+      </head>
+      <body>
+        {/* HTML 内でイベントハンドラを参照 */}
+        <button onclick="yourFunction()" type="button">
+          Click me
+        </button>
+        <form onsubmit="handleSubmit(event)">
+          <input type="text" required />
+          <button type="submit">Submit</button>
+        </form>
+      </body>
+    </html>
+  );
+};
+```
+
+**ステップ 3**: メインファイルで static ルートがマウントされているか確認
+
+```typescript
+// src/index.ts
+import static_routes from "./routes/static";
+
+app.route("/static", static_routes);
+```
+
+##### 利点
+
+- **セキュリティ**: CSP 準拠、XSS 攻撃のリスク軽減
+- **パフォーマンス**: ブラウザキャッシュが効く（Cache-Control ヘッダー）
+- **保守性**: JavaScript と HTML が分離され、デバッグしやすい
+- **型安全性**: TypeScript のチェックが効く
+
+##### 実装例
+
+現在のプロジェクトでは以下のファイルがこのパターンを使用しています:
+
+- `src/routes/static.ts`: `/static/login.js` と `/static/dashboard.js` を提供
+- `src/views/login.tsx`: ログイン/サインアップフォームのハンドラ
+- `src/views/dashboard.tsx`: パスワード設定フォームのハンドラ
+
 #### ディレクトリ構造
 ```
 src/
 ├── index.ts          # エントリポイント（app.route() のみ）
 ├── routes/           # 各リソースの Hono インスタンス
 │   ├── index.ts      # /, /health
+│   ├── auth.ts       # /api/auth/* のルート
+│   ├── dashboard.ts  # /dashboard のルート
+│   ├── static.ts     # /static/* (JavaScript ファイル配信)
 │   ├── ideas.ts      # /ideas/* のルート
 │   └── suggestions.ts # /suggestions/* のルート
-├── views/            # HTML ファイル
-│   ├── login.html
-│   └── dashboard.html
+├── views/            # HTML ファイル (Hono JSX)
+│   ├── login.tsx
+│   └── dashboard.tsx
 ├── services/         # ビジネスロジック
 │   └── suggestion.ts
 ├── lib/              # ユーティリティ
 │   ├── jwt.ts
-│   └── github.ts
+│   ├── github.ts
+│   ├── password.ts
+│   └── middleware.ts
 └── types/            # 型定義
     ├── bindings.ts
     └── context.ts

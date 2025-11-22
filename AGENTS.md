@@ -211,3 +211,36 @@ Suggestman の開発と運用を支える仮想エージェントの役割と連
 - ❌ **run_terminal_cmd ツールを使用しない**: ユーザーがすべてのコマンドを手動で実行します
 - ✅ **実行すべきコマンドを説明する**: 必要なコマンドとその目的を日本語で明確に説明してください
 - ✅ **コマンドはコードブロックで提示する**: ユーザーがコピー&ペーストしやすいように記載してください
+
+### JavaScript ファイルの分離ルール
+
+**重要**: Hono JSX では、HTML ビュー内に JavaScript を直接記述できません。
+
+#### 制約事項
+- Hono JSX の `<script>` タグ内では、`{}` が JSX 式として解釈されるため JavaScript が正しく動作しない
+- インライン JavaScript は CSP (Content Security Policy) 違反のリスクがある
+- `dangerouslySetInnerHTML` の使用は避けるべき（セキュリティリスク）
+
+#### 実装パターン
+1. **JavaScript は `src/routes/static.ts` で配信**:
+   ```typescript
+   app.get("/your-page.js", (c) => {
+     const js = `function yourFunction() { /* ... */ }`;
+     return c.text(js, 200, {
+       "Content-Type": "application/javascript",
+       "Cache-Control": "public, max-age=3600",
+     });
+   });
+   ```
+
+2. **HTML ビューでは外部ファイルを参照**:
+   ```tsx
+   <script src="/static/your-page.js"></script>
+   ```
+
+3. **利点**:
+   - セキュリティ: XSS 攻撃のリスク軽減
+   - パフォーマンス: ブラウザキャッシュが効く
+   - 保守性: コードの分離とデバッグのしやすさ
+
+詳細は `CLAUDE.md` の「JavaScript の外部ファイル分離パターン」を参照してください。

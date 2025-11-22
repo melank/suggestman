@@ -161,75 +161,7 @@ export const LoginPage: FC = () => {
 						}
 					`}
 				</style>
-				<script>
-					{`
-						function switchTab(tab) {
-							document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-							document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
-							document.querySelector(\`.tab[\${tab === 'login' ? 'onclick*="login"' : 'onclick*="signup"'}]\`).classList.add('active');
-							document.getElementById(tab).classList.add('active');
-						}
-
-						async function handleLogin(e) {
-							e.preventDefault();
-							const error = document.getElementById('login-error');
-							error.classList.remove('show');
-
-							const email = document.getElementById('login-email').value;
-							const password = document.getElementById('login-password').value;
-
-							try {
-								const res = await fetch('/api/auth/login', {
-									method: 'POST',
-									headers: {'Content-Type': 'application/json'},
-									body: JSON.stringify({email, password})
-								});
-
-								const data = await res.json();
-
-								if (res.ok) {
-									window.location.href = data.redirect;
-								} else {
-									error.textContent = data.error;
-									error.classList.add('show');
-								}
-							} catch (err) {
-								error.textContent = 'ログインに失敗しました';
-								error.classList.add('show');
-							}
-						}
-
-						async function handleSignup(e) {
-							e.preventDefault();
-							const error = document.getElementById('signup-error');
-							error.classList.remove('show');
-
-							const name = document.getElementById('signup-name').value;
-							const email = document.getElementById('signup-email').value;
-							const password = document.getElementById('signup-password').value;
-
-							try {
-								const res = await fetch('/api/auth/signup', {
-									method: 'POST',
-									headers: {'Content-Type': 'application/json'},
-									body: JSON.stringify({name, email, password})
-								});
-
-								const data = await res.json();
-
-								if (res.ok) {
-									window.location.href = data.redirect;
-								} else {
-									error.textContent = data.error;
-									error.classList.add('show');
-								}
-							} catch (err) {
-								error.textContent = 'サインアップに失敗しました';
-								error.classList.add('show');
-							}
-						}
-					`}
-				</script>
+				<script src="/static/login.js"></script>
 			</head>
 			<body>
 				<div class="container">
