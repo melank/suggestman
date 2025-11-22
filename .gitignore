@@ -29,3 +29,5 @@ build/
 # Editor directories
 .idea/
 .vscode/
+.claude/
+.dev.vars
