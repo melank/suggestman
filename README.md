@@ -8,8 +8,8 @@
 - **API 層**: Cloudflare Workers 上にデプロイされた Hono アプリケーション
   - リクエストルーターとバリデーション
   - 提案ロジックを呼び出すサービス層
-- **ストレージ**: 検討中（候補: Cloudflare D1, KV, Durable Objects など）
-  - MVP では簡易的なインメモリ実装または KV を用いた key-value ストアを想定
+- **ストレージ**: Cloudflare D1（SQLite ベース）
+  - MVP では D1 をメインデータストアとし、アイデアや提案履歴を保持
 
 ## リクエストフロー
 1. クライアントが Worker のエンドポイントへ HTTP リクエストを送信
@@ -67,14 +67,35 @@ sequenceDiagram
    curl http://127.0.0.1:8787/
    # => {"message":"Hello, Suggestman!","timestamp":"..."}
    ```
+4. D1 へ疎通確認  
+   ```bash
+   curl http://127.0.0.1:8787/ideas
+   # => {"ideas":[]}
+   ```
 
 ### Node.js バージョン
 - `.nvmrc` で Node.js 20 系を指定しています。`nvm use` または `nvm install` で環境を揃えてから `npm install` を実行してください。
 
+### Cloudflare D1 セットアップ
+1. データベース作成（初回のみ）  
+   ```bash
+   npx wrangler d1 create suggestman-db
+   ```
+   表示された `database_id` を `wrangler.toml` の `[[d1_databases]]` セクションへ反映してください。
+2. マイグレーション適用  
+   ```bash
+   npx wrangler d1 migrations apply suggestman-db --local
+   # 本番は --local を外して実行
+   ```
+3. 手動クエリ例  
+   ```bash
+   npx wrangler d1 execute suggestman-db --local --command "SELECT * FROM ideas;"
+   ```
+
 ## 開発ロードマップ（抜粋）
 - [x] Hono プロジェクトの初期セットアップ
 - [ ] `POST /api/suggestions` の仮実装（ダミーデータ返却）
-- [ ] ストレージ戦略の決定とデータアクセスレイヤの整備
+- [ ] ストレージアクセスレイヤと CRUD API の整備
 - [ ] 提案アルゴリズムの MVP 版実装（クールダウンを含む）
 - [ ] ロギング/監視の初期設計（Cloudflare Logs, Sentry 等の検討）
 

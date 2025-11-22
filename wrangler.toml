@@ -1,6 +1,14 @@
 name = "suggestman"
 main = "src/index.ts"
-compatibility_date = "2024-10-23"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+node_compat = true
 
 [dev]
 port = 8787
+
+[[d1_databases]]
+binding = "DB"
+database_name = "suggestman-db"
+# デプロイ前に `wrangler d1 create suggestman-db` で取得した ID に置き換えること
+database_id = "00000000-0000-0000-0000-000000000000"
