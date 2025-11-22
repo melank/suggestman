@@ -70,9 +70,66 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - 型定義は厳密に（`strict: true`）
 
 ### ファイル構成の原則
-- API ルートは機能ごとに分離
-- ビジネスロジックはサービス層に集約
-- データアクセスロジックは独立したレイヤーとして管理
+- **index.ts はコンパクトに**: エントリポイントとして `app.route()` でのルートマウントのみを行う
+- **API ルートは機能ごとに分離**: `src/routes/` 配下に各リソース単位で Hono インスタンスを作成
+- **HTML/CSS は別ファイルに**: 画面ごとに `src/views/` 配下に HTML ファイルを作成
+- **ビジネスロジックはサービス層に集約**: `src/services/` 配下に実装
+- **データアクセスロジックは独立したレイヤーとして管理**: リポジトリパターンを推奨
+- **型定義は共通化**: `src/types/` 配下で一元管理
+
+#### Hono のルーティングパターン
+各ルートファイルで `new Hono()` インスタンスを作成し、`export default` でエクスポート:
+
+```typescript
+// src/routes/ideas.ts
+import { Hono } from 'hono'
+import type { Bindings } from '../types/bindings'
+
+const app = new Hono<{ Bindings: Bindings }>()
+
+app.get('/', (c) => c.json('list ideas'))
+app.post('/', (c) => c.json('create idea', 201))
+app.get('/:id', (c) => c.json(`get ${c.req.param('id')}`))
+
+export default app
+```
+
+メインファイルで `app.route()` を使ってマウント:
+
+```typescript
+// src/index.ts
+import { Hono } from 'hono'
+import ideas from './routes/ideas'
+import suggestions from './routes/suggestions'
+
+const app = new Hono<{ Bindings: Bindings }>()
+
+app.route('/ideas', ideas)
+app.route('/suggestions', suggestions)
+
+export default app
+```
+
+#### ディレクトリ構造
+```
+src/
+├── index.ts          # エントリポイント（app.route() のみ）
+├── routes/           # 各リソースの Hono インスタンス
+│   ├── index.ts      # /, /health
+│   ├── ideas.ts      # /ideas/* のルート
+│   └── suggestions.ts # /suggestions/* のルート
+├── views/            # HTML ファイル
+│   ├── login.html
+│   └── dashboard.html
+├── services/         # ビジネスロジック
+│   └── suggestion.ts
+├── lib/              # ユーティリティ
+│   ├── jwt.ts
+│   └── github.ts
+└── types/            # 型定義
+    ├── bindings.ts
+    └── context.ts
+```
 
 ### 命名規則
 - コンポーネント: PascalCase

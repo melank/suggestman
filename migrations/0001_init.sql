@@ -1,17 +1,36 @@
-CREATE TABLE IF NOT EXISTS ideas (
+-- Users table for authentication
+CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  tags TEXT DEFAULT '[]',
-  note TEXT,
+  email TEXT UNIQUE,
+  name TEXT NOT NULL,
+  github_id TEXT UNIQUE,
+  password_hash TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_suggested_at TEXT,
-  snoozed_until TEXT
+  last_login_at TEXT
 );
 
-CREATE TRIGGER IF NOT EXISTS trigger_ideas_updated_at
-AFTER UPDATE ON ideas
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+
+-- Sessions table for refresh tokens
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+-- Trigger to update updated_at
+CREATE TRIGGER IF NOT EXISTS trigger_users_updated_at
+AFTER UPDATE ON users
 FOR EACH ROW
 BEGIN
-  UPDATE ideas SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
+  UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
 END;

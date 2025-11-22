@@ -11,13 +11,15 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"hono": "^4.4.6"
+		"@hono/node-server": "^1.19.6",
+		"hono": "^4.10.6",
+		"honox": "^0.1.52"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "^1.9.3",
 		"@cloudflare/workers-types": "^4.20241022.0",
 		"@types/node": "^22.7.5",
-		"@biomejs/biome": "^1.9.3",
 		"typescript": "^5.6.3",
-		"wrangler": "^3.80.1"
+		"wrangler": "^4.50.0"
 	}
 }
