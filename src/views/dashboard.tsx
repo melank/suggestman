@@ -38,7 +38,7 @@ export const DashboardPage: FC<DashboardPageProps> = ({user, hasPassword}) => {
 						.logo {
 							font-size: 1.5rem;
 							font-weight: bold;
-							color: #667eea;
+							color: #FFB347;
 						}
 						.user-info {
 							display: flex;
@@ -97,16 +97,17 @@ export const DashboardPage: FC<DashboardPageProps> = ({user, hasPassword}) => {
 						.suggestion-button {
 							width: 100%;
 							padding: 1.5rem;
-							background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+							background: #FFB347;
 							color: white;
 							border: none;
 							border-radius: 0.75rem;
 							font-size: 1.2rem;
 							font-weight: 600;
 							cursor: pointer;
-							transition: transform 0.2s;
+							transition: background 0.2s, transform 0.2s;
 						}
 						.suggestion-button:hover {
+							background: #FFA030;
 							transform: translateY(-2px);
 						}
 						.placeholder {
@@ -143,11 +144,11 @@ export const DashboardPage: FC<DashboardPageProps> = ({user, hasPassword}) => {
 						}
 						.password-form input:focus {
 							outline: none;
-							border-color: #667eea;
+							border-color: #FFB347;
 						}
 						.password-form button {
 							padding: 0.75rem 1.5rem;
-							background: #667eea;
+							background: #FFB347;
 							color: white;
 							border: none;
 							border-radius: 0.5rem;
@@ -157,7 +158,7 @@ export const DashboardPage: FC<DashboardPageProps> = ({user, hasPassword}) => {
 							transition: background 0.2s;
 						}
 						.password-form button:hover {
-							background: #5568d3;
+							background: #FFA030;
 						}
 						.success-message {
 							color: #28a745;

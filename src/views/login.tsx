@@ -16,7 +16,7 @@ export const LoginPage: FC = () => {
 						}
 						body {
 							font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-							background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+							background: linear-gradient(135deg, #FFF4D6 0%, #FFD670 100%);
 							min-height: 100vh;
 							display: flex;
 							align-items: center;
@@ -83,7 +83,7 @@ export const LoginPage: FC = () => {
 							transition: background 0.2s;
 						}
 						.tab.active {
-							background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+							background: #FFB347;
 							color: white;
 						}
 						.form-container {
@@ -110,21 +110,22 @@ export const LoginPage: FC = () => {
 						}
 						.form-group input:focus {
 							outline: none;
-							border-color: #667eea;
+							border-color: #FFB347;
 						}
 						.submit-button {
 							width: 100%;
 							padding: 1rem;
-							background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+							background: #FFB347;
 							color: white;
 							border: none;
 							border-radius: 0.5rem;
 							font-size: 1rem;
 							font-weight: 600;
 							cursor: pointer;
-							transition: transform 0.2s;
+							transition: background 0.2s, transform 0.2s;
 						}
 						.submit-button:hover {
+							background: #FFA030;
 							transform: translateY(-2px);
 						}
 						.divider {
