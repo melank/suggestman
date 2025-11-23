@@ -121,7 +121,7 @@ export default app
 
 1. **❌ 禁止**: `src/controllers/` ディレクトリに Controller クラスを作成すること
 2. **❌ 禁止**: static メソッドで処理を切り出して型推論を壊すこと
-3. **✅ 必須**: ルートファイル内に直接ハンドラを記述すること
+3. **✅ 必須**: ルートファイルが大きくなった場合は Factory パターン (`hono/factory`) で `src/handlers/` に分離すること
 4. **✅ 必須**: 複雑なビジネスロジックは `src/services/` に切り出すこと
 5. **✅ 必須**: データアクセスは必ず `src/repositories/` を経由すること
 
@@ -129,7 +129,7 @@ export default app
 
 もし「Controller を作って」「IdeasController に追加して」のような指示を受けた場合：
 
-**必ず指摘してください**: 「Hono のベストプラクティスに反するため、Controller は作成しません。代わりに、ルートファイル (`src/routes/ideas.ts` など) に直接ハンドラを記述します。」
+**必ず指摘してください**: 「Hono のベストプラクティスに反するため、Controller は作成しません。代わりに、Factory パターン (`hono/factory`) を使って `src/handlers/` にハンドラを作成し、ルートファイルからマウントします。」
 
 #### 複雑なロジックの切り出し
 
@@ -166,6 +166,95 @@ app.post('/', async (c) => {
 ```
 
 **参考**: [Hono Best Practices - Controllers](https://hono.dev/docs/guides/best-practices#controllers)
+
+#### Factory パターンによるハンドラの整理（公式推奨）
+
+ルートファイルが肥大化する場合は、**Hono Factory パターン**を使ってハンドラを別ファイルに切り出します。これは Controller パターンとは異なり、**型推論を維持したまま**コードを整理できる公式推奨の方法です。
+
+**参考**: [Hono Factory Helper](https://hono.dev/docs/helpers/factory)
+
+##### Factory パターンの実装方法
+
+**1. ハンドラファイルを作成** (`src/handlers/`)
+
+```typescript
+// src/handlers/auth.ts
+import { createFactory } from "hono/factory";
+import type { Bindings } from "../types/bindings";
+import { UserRepository } from "../repositories/UserRepository";
+
+// Factory を作成（型情報を渡す）
+const factory = createFactory<{ Bindings: Bindings }>();
+
+// ハンドラを export（型推論が効く！）
+export const login = factory.createHandlers(async (c) => {
+  const body = await c.req.json<{ email: string; password: string }>();
+  const { email, password } = body;
+
+  const userRepository = new UserRepository(c.env.DB);
+  const user = await userRepository.findByEmail(email);
+
+  if (!user) {
+    return c.json({ error: "ユーザーが見つかりません" }, 401);
+  }
+
+  // ...認証ロジック
+  return c.json({ success: true });
+});
+
+export const signup = factory.createHandlers(async (c) => {
+  // サインアップロジック...
+});
+```
+
+**2. ルートファイルで使用** (`src/routes/`)
+
+```typescript
+// src/routes/auth.ts
+import { Hono } from "hono";
+import type { Bindings } from "../types/bindings";
+import { login, signup } from "../handlers/auth";
+
+const app = new Hono<{ Bindings: Bindings }>();
+
+// スプレッド演算子でハンドラをマウント
+app.post("/login", ...login);
+app.post("/signup", ...signup);
+
+export default app;
+```
+
+##### Factory パターンのメリット
+
+- ✅ **型推論が維持される**: `c.req.param()` や `c.env` の型が正しく推論される
+- ✅ **コードが整理される**: ルートファイルがシンプルになり、ハンドラは別ファイルで管理
+- ✅ **再利用可能**: 複数のルートで同じハンドラを使い回せる
+- ✅ **テストしやすい**: ハンドラを個別にテスト可能
+- ✅ **公式推奨**: Hono の公式ドキュメントで推奨されているパターン
+
+##### ディレクトリ構造
+
+```
+src/
+├── handlers/         # Factory パターンで作成したハンドラ
+│   ├── auth.ts       # 認証関連のハンドラ
+│   ├── ideas.ts      # アイデア関連のハンドラ
+│   └── home.tsx      # ホーム関連のハンドラ（JSX の場合は .tsx）
+├── routes/           # ルーティング定義（薄く保つ）
+│   ├── auth.ts       # handlers/auth.ts をマウント
+│   ├── ideas.ts      # handlers/ideas.ts をマウント
+│   └── index.tsx     # handlers/home.tsx をマウント
+├── repositories/     # データアクセス層
+├── services/         # ビジネスロジック
+└── types/            # 型定義
+```
+
+##### ルール
+
+1. **✅ 推奨**: ルートファイルが 50 行を超えたら Factory パターンで分離
+2. **✅ 推奨**: ハンドラは `src/handlers/` 配下に作成
+3. **✅ 推奨**: ルートファイルには `app.get()` / `app.post()` とハンドラのマウントのみを記述
+4. **❌ 禁止**: Factory を使わずに関数を切り出して型推論を壊すこと
 
 ### エンドポイント設計
 
@@ -418,6 +507,7 @@ export default app;
 ### ディレクトリ構造
 ```
 tests/
+├── handlers/          # ハンドラ層のテスト
 ├── repositories/      # リポジトリ層のテスト
 └── services/          # サービス層のテスト
 ```
@@ -435,9 +525,9 @@ tests/
 import { describe, it, expect, jest } from "@jest/globals";
 import type { Context } from "hono";
 import type { Bindings } from "../../src/types/bindings";
-import { AuthController } from "../../src/controllers/auth";
+import { logout } from "../../src/handlers/auth";
 
-describe("AuthController", () => {
+describe("auth handlers", () => {
   describe("logout", () => {
     it("should set cookie with Max-Age=0 and redirect to /", async () => {
       const mockContext = {
@@ -448,7 +538,9 @@ describe("AuthController", () => {
         })),
       } as unknown as Context<{ Bindings: Bindings }>;
 
-      await AuthController.logout(mockContext);
+      // logout は createHandlers() で作成されたハンドラの配列
+      // 通常は [handler] の形式なので、最初の要素を呼び出す
+      await logout[0](mockContext);
 
       expect(mockContext.header).toHaveBeenCalledWith(
         "Set-Cookie",
@@ -718,7 +810,8 @@ app.route("/static", static_routes);
 ```
 src/
 ├── index.ts          # エントリポイント（app.route() のみ）
-├── routes/           # ルーティング定義とハンドラ実装
+├── handlers/         # Factory パターンのハンドラ実装
+├── routes/           # ルーティング定義（ハンドラをマウント）
 ├── repositories/     # データアクセス層（DBアクセスはここに集約）
 ├── views/            # HTML ファイル (Hono JSX)
 ├── services/         # ビジネスロジックとユーティリティ
@@ -737,11 +830,11 @@ src/
 1. データベーススキーマが必要な場合はマイグレーションを作成
 2. リポジトリを作成/更新 (`src/repositories/` 配下)
 3. リポジトリのテストを作成 (`tests/repositories/` 配下)
-4. Controller を作成/更新 (`src/controllers/` 配下)
-5. ルート定義を追加 (`src/routes/` 配下)
+4. Factory パターンでハンドラを作成/更新 (`src/handlers/` 配下)
+5. ルート定義を追加してハンドラをマウント (`src/routes/` 配下)
 6. 必要に応じてサービスロジックを実装 (`src/services/` 配下)
 7. 型定義を更新 (`src/types/` 配下)
-8. Controller のテストを作成/更新 (`tests/controllers/` 配下)
+8. ハンドラのテストを作成/更新 (`tests/handlers/` 配下)
 9. ローカルで動作確認 (`npm run dev`)
 10. すべてのテストが通ることを確認 (`npm test`)
 11. 型チェックと Lint を実行 (`npm run typecheck && npm run lint`)
