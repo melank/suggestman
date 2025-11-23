@@ -1,10 +1,30 @@
-import {Hono} from "hono";
+import { Hono } from "hono";
 
 const app = new Hono();
 
 // dashboard.js を提供
 app.get("/dashboard.js", (c) => {
-	const js = `async function handleSetPassword(e) {
+	const js = `async function handleLogout() {
+	try {
+		const res = await fetch('/api/auth/logout', {
+			method: 'POST',
+			credentials: 'same-origin',
+			redirect: 'manual'
+		});
+		// リダイレクトレスポンス(302)またはOKレスポンスの場合、ログイン画面へ
+		if (res.status === 302 || res.status === 0 || res.ok) {
+			window.location.href = '/';
+		} else {
+			console.error('Logout failed with status:', res.status);
+			alert('ログアウトに失敗しました');
+		}
+	} catch (err) {
+		console.error('Logout error:', err);
+		alert('ログアウトに失敗しました: ' + err.message);
+	}
+}
+
+async function handleSetPassword(e) {
 	e.preventDefault();
 	const error = document.getElementById('password-error');
 	const success = document.getElementById('password-success');
@@ -36,7 +56,7 @@ app.get("/dashboard.js", (c) => {
 
 	return c.text(js, 200, {
 		"Content-Type": "application/javascript",
-		"Cache-Control": "public, max-age=3600",
+		"Cache-Control": "no-cache, no-store, must-revalidate",
 	});
 });
 
@@ -106,7 +126,7 @@ async function handleSignup(e) {
 
 	return c.text(js, 200, {
 		"Content-Type": "application/javascript",
-		"Cache-Control": "public, max-age=3600",
+		"Cache-Control": "no-cache, no-store, must-revalidate",
 	});
 });
 

@@ -24,8 +24,9 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 ```
 
 ### 主要コンポーネント
-- **API 層**: Hono によるリクエストルーティング、バリデーション
-- **サービス層**: 提案ロジック、フィルタリング、優先順位付け
+- **ルート層** (`src/routes/`): Hono によるルーティング定義のみ（薄い層）
+- **Controller 層** (`src/controllers/`): リクエスト処理、レスポンス生成、バリデーション
+- **サービス層** (`src/services/`): ビジネスロジック、提案ロジック、フィルタリング
 - **ストレージ層**: D1 によるアイデア管理、提案履歴
 
 ### エンドポイント設計
@@ -67,11 +68,14 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - **Linter/Formatter**: Biome を使用
 - コミット前に `npm run format` と `npm run lint` を実行
 - 型定義は厳密に（`strict: true`）
+- **オブジェクト型定義のスペース**: `{}` の内側にはスペースを入れる（例: `{ Bindings: Bindings }` ではなく `{Bindings: Bindings}` は NG）
 - **個人情報の禁止**: コード、コメント、seed データに個人情報（メールアドレス、電話番号、住所など）を含めない。もしくは架空の情報や個人に紐づかないものとする（メールアドレスや電話番号は利用されているものは許容しない、住所も公共物に限定する）
 
 ### ファイル構成の原則
 - **index.ts はコンパクトに**: エントリポイントとして `app.route()` でのルートマウントのみを行う
 - **API ルートは機能ごとに分離**: `src/routes/` 配下に各リソース単位で Hono インスタンスを作成
+- **ルートファイルにロジックを書かない**: ルーティング定義のみを記述し、処理は Controller に委譲
+- **Controller 層で処理を実装**: `src/controllers/` 配下にリクエスト処理とレスポンス生成を実装
 - **HTML/CSS は別ファイルに**: 画面ごとに `src/views/` 配下に HTML ファイルを作成
 - **JavaScript は外部ファイルに分離**: `src/routes/static.ts` で配信（詳細は後述）
 - **ビジネスロジックはサービス層に集約**: `src/services/` 配下に実装
@@ -79,23 +83,68 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - **型定義は共通化**: `src/types/` 配下で一元管理
 
 #### Hono のルーティングパターン
-各ルートファイルで `new Hono()` インスタンスを作成し、`export default` でエクスポート:
+
+##### ルートファイル
+各ルートファイルで `new Hono()` インスタンスを作成し、Controller に処理を委譲:
 
 ```typescript
 // src/routes/ideas.ts
 import { Hono } from 'hono'
 import type { Bindings } from '../types/bindings'
+import { authMiddleware } from '../lib/middleware'
+import { IdeasController } from '../controllers/ideas'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
-app.get('/', (c) => c.json('list ideas'))
-app.post('/', (c) => c.json('create idea', 201))
-app.get('/:id', (c) => c.json(`get ${c.req.param('id')}`))
+// ミドルウェア適用
+app.use('/*', authMiddleware)
+
+// ルーティング定義（Controller に委譲）
+app.get('/', IdeasController.list)
+app.post('/', IdeasController.create)
+app.get('/:id', IdeasController.get)
 
 export default app
 ```
 
-メインファイルで `app.route()` を使ってマウント:
+##### Controller ファイル
+リクエスト処理とレスポンス生成を実装:
+
+```typescript
+// src/controllers/ideas.ts
+import type { Context } from 'hono'
+import type { Bindings, JWTPayload } from '../types/bindings'
+
+export class IdeasController {
+  /**
+   * アイデア一覧取得
+   */
+  static async list(
+    c: Context<{ Bindings: Bindings; Variables: { user: JWTPayload } }>
+  ) {
+    const user = c.get('user')
+    const userId = user.sub
+
+    try {
+      const { results } = await c.env.DB.prepare(
+        'SELECT * FROM ideas WHERE user_id = ? ORDER BY created_at DESC'
+      )
+        .bind(userId)
+        .all()
+
+      return c.json({ ideas: results })
+    } catch (error) {
+      console.error('Failed to fetch ideas:', error)
+      return c.json({ error: 'アイデアの取得に失敗しました' }, 500)
+    }
+  }
+
+  // 他のメソッド...
+}
+```
+
+##### メインファイル
+`app.route()` でルートをマウント:
 
 ```typescript
 // src/index.ts
@@ -215,13 +264,17 @@ app.route("/static", static_routes);
 ```
 src/
 ├── index.ts          # エントリポイント（app.route() のみ）
-├── routes/           # 各リソースの Hono インスタンス
-│   ├── index.ts      # /, /health
+├── routes/           # ルーティング定義のみ（薄い層）
+│   ├── index.tsx     # /, /health
 │   ├── auth.ts       # /api/auth/* のルート
-│   ├── dashboard.ts  # /dashboard のルート
+│   ├── dashboard.tsx # /dashboard のルート
 │   ├── static.ts     # /static/* (JavaScript ファイル配信)
 │   ├── ideas.ts      # /ideas/* のルート
 │   └── suggestions.ts # /suggestions/* のルート
+├── controllers/      # リクエスト処理とレスポンス生成
+│   ├── home.tsx      # ホームページ、ヘルスチェック
+│   ├── auth.ts       # 認証関連の処理
+│   └── ideas.ts      # アイデア管理の処理
 ├── views/            # HTML ファイル (Hono JSX)
 │   ├── login.tsx
 │   └── dashboard.tsx
