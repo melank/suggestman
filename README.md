@@ -35,45 +35,6 @@ sequenceDiagram
     Worker-->>Client: JSON (idea, message, metadata)
 ```
 
-## 主要エンドポイント
-
-### 認証関連
-- `GET /` - ログインページ（未認証の場合）/ ダッシュボードへリダイレクト（認証済み）
-- `POST /api/auth/signup` - メールアドレスとパスワードでサインアップ
-- `POST /api/auth/login` - メールアドレスとパスワードでログイン
-- `GET /api/auth/github` - GitHub OAuth フロー開始
-- `GET /api/auth/github/callback` - GitHub OAuth コールバック
-- `POST /api/auth/logout` - ログアウト
-
-### ダッシュボード
-- `GET /dashboard` - ユーザーダッシュボード（認証必須）
-- `POST /api/user/password` - パスワード設定/変更（GitHub 認証ユーザー含む）
-
-### アイデア管理（未実装）
-- `GET /api/ideas` - 登録済みアイデアの一覧取得
-- `POST /api/ideas` - 新しいアイデアの登録
-- `PUT /api/ideas/:id` - アイデアの更新
-- `DELETE /api/ideas/:id` - アイデアの削除
-
-### 提案機能（未実装）
-- `POST /api/suggestions` - コンテキストに基づいた提案を取得
-  - ボディ: `{ "mood": "low_energy", "availableMinutes": 60, "includeTags": ["indoor"] }`
-  - レスポンス: `{ "idea": {...}, "motivationalMessage": "...", "servedAt": "2025-..." }`
-
-### 静的ファイル配信
-- `GET /static/:filename` - JavaScript ファイルの配信（login.js, dashboard.js など）
-
-※ 実際のエンドポイント構成は実装フェーズで調整予定。
-
-## サジェストロジック概要
-- 入力: ユーザーの気分・タグ・除外リストなどのコンテキスト
-- プロセス:
-  1. ストレージから候補アイデアを取得
-  2. コンテキストに応じたフィルタリング（タグ一致、スヌーズ中アイデアの除外など）
-  3. 直近に提示した候補を避けるためのクールダウンチェック
-  4. ランダムまたは重み付けによる最終選定
-- 出力: 選定したアイデアと後押しメッセージ
-
 ## ローカル開発
 
 ### 環境変数の設定
@@ -164,9 +125,6 @@ sequenceDiagram
 
 このプロジェクトは MIT ライセンスの下で公開されています。詳細は [LICENSE](./LICENSE) ファイルをご覧ください。
 
-## コントリビューション
-
-コントリビューションを歓迎します！バグ報告、機能リクエスト、プルリクエストなど、お気軽にご参加ください。
 
 ### 開発ガイドライン
 
