@@ -20,15 +20,152 @@ Suggestman は、自由時間が突然生まれた瞬間に「本当にやりた
 
 ### システム構成
 ```
-Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
+Client → Cloudflare Workers (Hono) → Service Layer → Repository Layer → D1 Storage
 ```
 
 ### 主要コンポーネント
-- **ルート層** (`src/routes/`): Hono によるルーティング定義のみ（薄い層）
-- **Controller 層** (`src/controllers/`): リクエスト処理、レスポンス生成、バリデーション（ビジネスロジックやDBアクセスは含まない）
+- **ルート層** (`src/routes/`): Hono によるルーティング定義とリクエストハンドラ
 - **サービス層** (`src/services/`): ビジネスロジック、提案ロジック、フィルタリング
 - **リポジトリ層** (`src/repositories/`): データアクセス層（D1 データベースへのアクセスを抽象化）
 - **ストレージ層**: D1 によるアイデア管理、提案履歴
+
+### 🚫 Hono ベストプラクティス - Controller パターンの禁止
+
+**重要**: Hono 公式ドキュメント ([Best Practices](https://hono.dev/docs/guides/best-practices)) では、**「可能な限り、Rails のような Controller を作らないでください」**と明記されています。
+
+#### なぜ Controller を使わないのか
+
+Hono で Controller クラスを作ると、**型推論が壊れる**という問題があります：
+
+```typescript
+// ❌ Controller パターン（型推論が効かない）
+export class IdeasController {
+  static async get(c: Context) {
+    const id = c.req.param('id')  // 型推論できない！
+    // ...
+  }
+}
+
+// ✅ 推奨パターン（型推論が効く）
+app.get('/ideas/:id', (c) => {
+  const id = c.req.param('id')  // 型が自動的に推論される
+  // ...
+})
+```
+
+パスパラメータの型を Controller で推論させるには、複雑な Generics を書く必要があり、コードが煩雑になります。
+
+#### 推奨パターン
+
+Hono では `app.route()` を使ってルートファイルを分割し、**ルートファイルに直接ハンドラを記述**します：
+
+```typescript
+// src/routes/ideas.ts
+import { Hono } from 'hono'
+import type { Bindings } from '../types/bindings'
+import { authMiddleware, type AuthContext } from '../services/middleware'
+import { IdeaRepository } from '../repositories/IdeaRepository'
+
+const app = new Hono<{ Bindings: Bindings } & AuthContext>()
+
+// 認証ミドルウェア適用
+app.use('/*', authMiddleware)
+
+// アイデア一覧取得（ハンドラを直接記述）
+app.get('/', async (c) => {
+  const user = c.get('user')
+  const userId = user.sub
+
+  try {
+    const ideaRepository = new IdeaRepository(c.env.DB)
+    const ideas = await ideaRepository.findByUserId(userId)
+    return c.json({ ideas })
+  } catch (error) {
+    console.error('Failed to fetch ideas:', error)
+    return c.json({ error: 'アイデアの取得に失敗しました' }, 500)
+  }
+})
+
+// アイデア詳細取得
+app.get('/:id', async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')  // 型推論が効く！
+
+  try {
+    const ideaRepository = new IdeaRepository(c.env.DB)
+    const idea = await ideaRepository.findById(id)
+
+    if (!idea || idea.user_id !== user.sub) {
+      return c.json({ error: 'アイデアが見つかりません' }, 404)
+    }
+
+    return c.json({ idea })
+  } catch (error) {
+    console.error('Failed to fetch idea:', error)
+    return c.json({ error: 'アイデアの取得に失敗しました' }, 500)
+  }
+})
+
+export default app
+```
+
+#### ファイル命名規則
+
+公式の推奨パターンでは、**リソース名の複数形**をファイル名として使用します：
+
+- ✅ `src/routes/ideas.ts` - アイデアの一覧、作成、更新、削除
+- ✅ `src/routes/suggestions.ts` - サジェストの一覧、作成
+- ✅ `src/routes/users.ts` - ユーザーの一覧、取得
+
+#### 絶対に守るべきルール
+
+1. **❌ 禁止**: `src/controllers/` ディレクトリに Controller クラスを作成すること
+2. **❌ 禁止**: static メソッドで処理を切り出して型推論を壊すこと
+3. **✅ 必須**: ルートファイル内に直接ハンドラを記述すること
+4. **✅ 必須**: 複雑なビジネスロジックは `src/services/` に切り出すこと
+5. **✅ 必須**: データアクセスは必ず `src/repositories/` を経由すること
+
+#### 間違った指示への対処
+
+もし「Controller を作って」「IdeasController に追加して」のような指示を受けた場合：
+
+**必ず指摘してください**: 「Hono のベストプラクティスに反するため、Controller は作成しません。代わりに、ルートファイル (`src/routes/ideas.ts` など) に直接ハンドラを記述します。」
+
+#### 複雑なロジックの切り出し
+
+ハンドラが長くなる場合は、ビジネスロジックを Service 層に切り出します：
+
+```typescript
+// src/services/ideaSuggestion.ts
+export class IdeaSuggestionService {
+  constructor(
+    private ideaRepository: IdeaRepository,
+    private suggestionRepository: SuggestionRepository
+  ) {}
+
+  async suggestIdea(userId: string): Promise<Idea | null> {
+    // 複雑な提案ロジック
+    const ideas = await this.ideaRepository.findByUserId(userId)
+    const recentSuggestions = await this.suggestionRepository.findRecent(userId)
+    // フィルタリング、優先順位付けなど...
+    return selectedIdea
+  }
+}
+
+// src/routes/suggestions.ts
+app.post('/', async (c) => {
+  const user = c.get('user')
+
+  const ideaRepository = new IdeaRepository(c.env.DB)
+  const suggestionRepository = new SuggestionRepository(c.env.DB)
+  const service = new IdeaSuggestionService(ideaRepository, suggestionRepository)
+
+  const suggestion = await service.suggestIdea(user.sub)
+  return c.json({ suggestion })
+})
+```
+
+**参考**: [Hono Best Practices - Controllers](https://hono.dev/docs/guides/best-practices#controllers)
 
 ### エンドポイント設計
 
@@ -60,7 +197,7 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 
 **使用例:**
 ```typescript
-// Controller 内での使用例
+// ルートハンドラ内での使用例
 import { UserRepository } from '../repositories/UserRepository';
 
 const userRepository = new UserRepository(c.env.DB);
@@ -79,7 +216,7 @@ if (!user) {
 
 **使用例:**
 ```typescript
-// Controller 内での使用例
+// ルートハンドラ内での使用例
 import { IdeaRepository } from '../repositories/IdeaRepository';
 
 const ideaRepository = new IdeaRepository(c.env.DB);
@@ -184,38 +321,42 @@ describe("SuggestionRepository", () => {
 - 戻り値の型と内容が期待通りか確認
 - エッジケース（null、空配列など）もテスト
 
-#### 3. Controller からの利用
+#### 3. ルートハンドラからの利用
 
-Controller では、リポジトリを経由してデータアクセスを行います：
+ルートファイルでは、リポジトリを経由してデータアクセスを行います：
 
 ```typescript
-// src/controllers/suggestions.ts
-import type { Context } from "hono";
+// src/routes/suggestions.ts
+import { Hono } from "hono";
 import type { Bindings, JWTPayload } from "../types/bindings";
+import { authMiddleware, type AuthContext } from "../services/middleware";
 import { SuggestionRepository } from "../repositories/SuggestionRepository";
 import { IdeaRepository } from "../repositories/IdeaRepository";
 
-export class SuggestionsController {
-  static async list(
-    c: Context<{ Bindings: Bindings; Variables: { user: JWTPayload } }>
-  ) {
-    const user = c.get("user");
+const app = new Hono<{ Bindings: Bindings } & AuthContext>();
 
-    try {
-      // リポジトリを使ってデータ取得
-      const suggestionRepository = new SuggestionRepository(c.env.DB);
-      const suggestions = await suggestionRepository.findByUserId(user.sub);
+app.use("/*", authMiddleware);
 
-      return c.json({ suggestions });
-    } catch (error) {
-      console.error("Failed to fetch suggestions:", error);
-      return c.json({ error: "提案履歴の取得に失敗しました" }, 500);
-    }
+// 提案履歴一覧
+app.get("/", async (c) => {
+  const user = c.get("user");
+
+  try {
+    // リポジトリを使ってデータ取得
+    const suggestionRepository = new SuggestionRepository(c.env.DB);
+    const suggestions = await suggestionRepository.findByUserId(user.sub);
+
+    return c.json({ suggestions });
+  } catch (error) {
+    console.error("Failed to fetch suggestions:", error);
+    return c.json({ error: "提案履歴の取得に失敗しました" }, 500);
   }
-}
+});
+
+export default app;
 ```
 
-**Controller の責務:**
+**ルートハンドラの責務:**
 - リクエストパラメータの取得とバリデーション
 - リポジトリのインスタンス化（`new Repository(c.env.DB)`）
 - リポジトリメソッドの呼び出し
@@ -223,9 +364,9 @@ export class SuggestionsController {
 - エラーハンドリング
 
 **禁止事項:**
-- ❌ Controller から直接 `c.env.DB.prepare()` を呼ぶ
-- ❌ SQL クエリを Controller に記述する
-- ❌ データの変換ロジックを Controller に記述する（リポジトリで行う）
+- ❌ ハンドラから直接 `c.env.DB.prepare()` を呼ぶ
+- ❌ SQL クエリをルートファイルに記述する
+- ❌ データの変換ロジックをルートファイルに記述する（リポジトリで行う）
 
 ### リポジトリ設計のベストプラクティス
 
@@ -277,10 +418,8 @@ export class SuggestionsController {
 ### ディレクトリ構造
 ```
 tests/
-├── controllers/       # Controller 層のテスト
 ├── repositories/      # リポジトリ層のテスト
-├── services/          # サービス層のテスト
-└── lib/               # ユーティリティのテスト
+└── services/          # サービス層のテスト
 ```
 
 **重要**: Node.js/TypeScript プロジェクトのデファクトスタンダードに従い、テストは `src/__tests__/` ではなく、プロジェクトルートの `tests/` ディレクトリに配置します。
@@ -399,72 +538,63 @@ git commit --no-verify -m "your message"
 ### ファイル構成の原則
 - **index.ts はコンパクトに**: エントリポイントとして `app.route()` でのルートマウントのみを行う
 - **API ルートは機能ごとに分離**: `src/routes/` 配下に各リソース単位で Hono インスタンスを作成
-- **ルートファイルにロジックを書かない**: ルーティング定義のみを記述し、処理は Controller に委譲
-- **Controller 層で処理を実装**: `src/controllers/` 配下にリクエスト処理とレスポンス生成を実装
+- **ルートファイルに直接ハンドラを記述**: Controller クラスは作らず、ルートファイル内でリクエスト処理を実装
 - **HTML/CSS は別ファイルに**: 画面ごとに `src/views/` 配下に HTML ファイルを作成
 - **JavaScript は外部ファイルに分離**: `src/routes/static.ts` で配信（詳細は後述）
-- **ビジネスロジックはサービス層に集約**: `src/services/` 配下に実装
-- **データアクセスロジックは独立したレイヤーとして管理**: リポジトリパターンを推奨
+- **ビジネスロジックはサービス層に集約**: `src/services/` 配下に実装（ハンドラが長くなる場合）
+- **データアクセスロジックは独立したレイヤーとして管理**: リポジトリパターン必須
 - **型定義は共通化**: `src/types/` 配下で一元管理
 
 #### Hono のルーティングパターン
 
-##### ルートファイル
-各ルートファイルで `new Hono()` インスタンスを作成し、Controller に処理を委譲:
+**重要**: このプロジェクトでは Hono の推奨パターンに従い、**Controller クラスを使用しません**。
+
+##### ルートファイル（正しいパターン）
+各ルートファイルで `new Hono()` インスタンスを作成し、ハンドラを直接記述:
 
 ```typescript
 // src/routes/ideas.ts
 import { Hono } from 'hono'
 import type { Bindings } from '../types/bindings'
-import { authMiddleware } from '../lib/middleware'
-import { IdeasController } from '../controllers/ideas'
+import { authMiddleware, type AuthContext } from '../services/middleware'
+import { IdeaRepository } from '../repositories/IdeaRepository'
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings } & AuthContext>()
 
 // ミドルウェア適用
 app.use('/*', authMiddleware)
 
-// ルーティング定義（Controller に委譲）
-app.get('/', IdeasController.list)
-app.post('/', IdeasController.create)
-app.get('/:id', IdeasController.get)
+// アイデア一覧取得（ハンドラを直接記述）
+app.get('/', async (c) => {
+  const user = c.get('user')
+  const userId = user.sub
+
+  try {
+    const ideaRepository = new IdeaRepository(c.env.DB)
+    const ideas = await ideaRepository.findByUserId(userId)
+    return c.json({ ideas })
+  } catch (error) {
+    console.error('Failed to fetch ideas:', error)
+    return c.json({ error: 'アイデアの取得に失敗しました' }, 500)
+  }
+})
+
+// アイデア作成
+app.post('/', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json()
+
+  // バリデーション、リポジトリ呼び出しなど...
+  return c.json({ success: true }, 201)
+})
+
+// アイデア詳細取得（パスパラメータの型推論が効く）
+app.get('/:id', async (c) => {
+  const id = c.req.param('id')  // 型が自動推論される
+  // 処理...
+})
 
 export default app
-```
-
-##### Controller ファイル
-リクエスト処理とレスポンス生成を実装（リポジトリを使用）:
-
-```typescript
-// src/controllers/ideas.ts
-import type { Context } from 'hono'
-import type { Bindings, JWTPayload } from '../types/bindings'
-import { IdeaRepository } from '../repositories/IdeaRepository'
-
-export class IdeasController {
-  /**
-   * アイデア一覧取得
-   */
-  static async list(
-    c: Context<{ Bindings: Bindings; Variables: { user: JWTPayload } }>
-  ) {
-    const user = c.get('user')
-    const userId = user.sub
-
-    try {
-      // リポジトリを使用してデータ取得
-      const ideaRepository = new IdeaRepository(c.env.DB)
-      const ideas = await ideaRepository.findByUserId(userId)
-
-      return c.json({ ideas })
-    } catch (error) {
-      console.error('Failed to fetch ideas:', error)
-      return c.json({ error: 'アイデアの取得に失敗しました' }, 500)
-    }
-  }
-
-  // 他のメソッド...
-}
 ```
 
 ##### メインファイル
@@ -588,12 +718,10 @@ app.route("/static", static_routes);
 ```
 src/
 ├── index.ts          # エントリポイント（app.route() のみ）
-├── routes/           # ルーティング定義のみ（薄い層）
-├── controllers/      # リクエスト処理とレスポンス生成（DBアクセス禁止）
+├── routes/           # ルーティング定義とハンドラ実装
 ├── repositories/     # データアクセス層（DBアクセスはここに集約）
 ├── views/            # HTML ファイル (Hono JSX)
-├── services/         # ビジネスロジック
-├── lib/              # ユーティリティ
+├── services/         # ビジネスロジックとユーティリティ
 └── types/            # 型定義
 ```
 
@@ -647,9 +775,9 @@ src/
    });
    ```
 
-3. **Controller から利用**
+3. **ルートハンドラから利用**
    ```typescript
-   // src/controllers/ideas.ts
+   // src/routes/ideas.ts
    const ideaRepository = new IdeaRepository(c.env.DB);
    const ideas = await ideaRepository.findByTag(userId, tag);
    ```
@@ -734,6 +862,12 @@ src/
 
 1. **タスクの理解**: README.md と AGENTS.md でコンテキストを把握
 2. **設計の確認**: 既存のアーキテクチャに沿った実装を心がける
-3. **テスト**: ローカル環境で十分に動作確認
-4. **コードレビュー**: Lint、型チェック、フォーマットを実行
+3. **実装**: コードを記述
+4. **品質チェック（必須）**: 修正完了前に必ず以下を実行
+   ```bash
+   npm run format  # コードフォーマット
+   npm run lint    # Lint チェック
+   npm test        # テスト実行
+   ```
+   **重要**: Claude による修正が完了する前に、必ずこれらのチェックを実行してください。すべてのチェックが成功することを確認してから、ユーザーに報告してください。
 5. **デプロイ**: 段階的にリリース
