@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running format and lint checks..."
+
+# フォーマットを実行
+npm run format
+
+# リントを実行（エラーがあればコミットを中止）
+npm run lint
+
+echo "✅ Format and lint checks passed!"

@@ -167,10 +167,33 @@ npm run test:coverage
 
 ### スタイルガイド
 - **Linter/Formatter**: Biome を使用
-- コミット前に `npm run format` と `npm run lint` を実行
 - 型定義は厳密に（`strict: true`）
 - **オブジェクト型定義のスペース**: `{}` の内側にはスペースを入れる（例: `{ Bindings: Bindings }` ではなく `{Bindings: Bindings}` は NG）
 - **個人情報の禁止**: コード、コメント、seed データに個人情報（メールアドレス、電話番号、住所など）を含めない。もしくは架空の情報や個人に紐づかないものとする（メールアドレスや電話番号は利用されているものは許容しない、住所も公共物に限定する）
+
+#### Git コミット前の自動チェック（Husky）
+
+このプロジェクトでは、[Husky](https://typicode.github.io/husky/) を使用して Git コミット前に自動的にコードフォーマットとリントチェックを実行します。
+
+**動作:**
+- `git commit` 実行時に自動的に以下が実行されます:
+  1. `npm run format` - Biome によるコードの自動フォーマット
+  2. `npm run lint` - Biome によるリントチェック
+- リントエラーがある場合はコミットが中止されます
+
+**初回セットアップ:**
+```bash
+npm install
+npx husky init
+chmod +x .husky/pre-commit
+```
+
+**手動でスキップする場合（非推奨）:**
+```bash
+git commit --no-verify -m "your message"
+```
+
+**注意:** 通常は自動チェックに従い、エラーを修正してからコミットしてください。これにより、コードの品質と一貫性が保たれます。
 
 ### ファイル構成の原則
 - **index.ts はコンパクトに**: エントリポイントとして `app.route()` でのルートマウントのみを行う

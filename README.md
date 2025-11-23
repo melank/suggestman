@@ -67,16 +67,24 @@ sequenceDiagram
    ```bash
    npm install
    ```
-2. 開発サーバーを起動
+2. Husky のセットアップ（初回のみ）
+   ```bash
+   # Husky を初期化
+   npx husky init
+
+   # pre-commit フックに実行権限を付与
+   chmod +x .husky/pre-commit
+   ```
+3. 開発サーバーを起動
    ```bash
    npm run dev
    ```
-3. 別ターミナルまたはブラウザから確認
+4. 別ターミナルまたはブラウザから確認
    ```bash
    curl http://127.0.0.1:8787/
    # => {"message":"Hello, Suggestman!","timestamp":"..."}
    ```
-4. D1 へ疎通確認
+5. D1 へ疎通確認
    ```bash
    curl http://127.0.0.1:8787/ideas
    # => {"ideas":[]}
@@ -134,5 +142,28 @@ sequenceDiagram
 ### コーディング規約
 
 - Biome による Lint とフォーマット
-- コミット前に `npm run format` と `npm run lint` を実行
 - TypeScript strict モード有効
+
+#### Git コミット前の自動チェック（Husky）
+
+このプロジェクトでは、[Husky](https://typicode.github.io/husky/) を使用して Git コミット前に自動的にコードフォーマットとリントチェックを実行します。
+
+**動作:**
+- `git commit` 実行時に自動的に以下が実行されます:
+  1. `npm run format` - コードの自動フォーマット
+  2. `npm run lint` - リントチェック
+- リントエラーがある場合はコミットが中止されます
+
+**初回セットアップ:**
+```bash
+npm install
+npx husky init
+chmod +x .husky/pre-commit
+```
+
+**手動でスキップする場合（非推奨）:**
+```bash
+git commit --no-verify -m "your message"
+```
+
+**注意:** 通常は自動チェックに従い、エラーを修正してからコミットしてください。

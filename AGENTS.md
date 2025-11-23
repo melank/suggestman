@@ -166,8 +166,28 @@ Suggestman の開発と運用を支える仮想エージェントの役割と連
 ### 開発ツール
 - **IDE**: VSCode + Biome 拡張機能推奨
 - **バージョン管理**: Git + GitHub
+- **Git フック管理**: Husky（コミット前の自動フォーマット・リントチェック）
 - **CI/CD**: GitHub Actions (Lint、TypeCheck、デプロイ)
 - **デバッグ**: Wrangler Dev + Chrome DevTools
+
+#### Husky による自動チェック
+
+このプロジェクトでは、[Husky](https://typicode.github.io/husky/) を使用して Git コミット前に自動的にコードフォーマットとリントチェックを実行します。
+
+**動作:**
+- `git commit` 実行時に自動的に以下が実行されます:
+  1. `npm run format` - Biome によるコードの自動フォーマット
+  2. `npm run lint` - Biome によるリントチェック
+- リントエラーがある場合はコミットが中止されます
+
+**設定ファイル:**
+- `.husky/pre-commit`: pre-commit フックのスクリプト
+- `package.json`: `prepare` スクリプトで Husky を自動初期化
+
+**利点:**
+- コミット前に自動的にコード品質をチェック
+- チーム全体でコードスタイルの一貫性を保つ
+- CI/CD でのエラーを事前に防ぐ
 
 ### コラボレーションツール
 - **デザイン**: Figma などの共同編集環境で画面遷移図とコンポーネント管理
