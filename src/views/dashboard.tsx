@@ -27,16 +27,26 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 						}
 						body {
 							font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-							background: #f5f5f5;
+							background: linear-gradient(135deg, #FFF4D6 0%, #FFD670 100%);
 							min-height: 100vh;
 						}
 						.header {
 							background: white;
 							border-bottom: 1px solid #e0e0e0;
 							padding: 1rem 2rem;
+						}
+						.header-top {
 							display: flex;
 							justify-content: space-between;
 							align-items: center;
+							margin-bottom: 1rem;
+						}
+						.header-welcome {
+							font-size: 1.1rem;
+							color: #666;
+						}
+						.header-welcome strong {
+							color: #333;
 						}
 						.logo {
 							font-size: 1.5rem;
@@ -68,22 +78,6 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 							max-width: 1200px;
 							margin: 2rem auto;
 							padding: 0 2rem;
-						}
-						.welcome {
-							background: white;
-							padding: 2rem;
-							border-radius: 1rem;
-							box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-							margin-bottom: 2rem;
-						}
-						.welcome h1 {
-							font-size: 2rem;
-							color: #333;
-							margin-bottom: 0.5rem;
-						}
-						.welcome p {
-							color: #666;
-							font-size: 1rem;
 						}
 						.section {
 							background: white;
@@ -185,18 +179,78 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 						.error-message.show {
 							display: block;
 						}
+						.suggestion-card {
+							background: linear-gradient(135deg, #FFB347 0%, #FFA030 100%);
+							color: white;
+							padding: 2rem;
+							border-radius: 1rem;
+							box-shadow: 0 4px 12px rgba(255, 179, 71, 0.3);
+						}
+						.suggestion-title {
+							font-size: 1.8rem;
+							margin-bottom: 1rem;
+							font-weight: bold;
+						}
+						.suggestion-message {
+							font-size: 1.1rem;
+							margin-bottom: 1.5rem;
+							opacity: 0.95;
+						}
+						.suggestion-details {
+							display: flex;
+							gap: 1rem;
+							margin-bottom: 1rem;
+							flex-wrap: wrap;
+						}
+						.suggestion-tags {
+							display: flex;
+							gap: 0.5rem;
+							flex-wrap: wrap;
+						}
+						.suggestion-tag {
+							background: rgba(255, 255, 255, 0.3);
+							padding: 0.25rem 0.75rem;
+							border-radius: 1rem;
+							font-size: 0.9rem;
+						}
+						.suggestion-time {
+							display: flex;
+							align-items: center;
+							gap: 0.5rem;
+							background: rgba(255, 255, 255, 0.3);
+							padding: 0.25rem 0.75rem;
+							border-radius: 1rem;
+							font-size: 0.9rem;
+						}
+						.suggestion-note {
+							background: rgba(255, 255, 255, 0.2);
+							padding: 1rem;
+							border-radius: 0.5rem;
+							font-size: 0.95rem;
+							margin-top: 1rem;
+						}
+						.suggestion-button:disabled {
+							background: #ccc;
+							cursor: not-allowed;
+							transform: none;
+						}
 					`}
 				</style>
 				<script src="/static/dashboard.js" defer />
 			</head>
 			<body>
 				<div class="header">
-					<div class="logo">Suggestman</div>
-					<div class="user-info">
-						<span class="user-name">{user.name}</span>
-						<button class="logout-btn" onclick="handleLogout()" type="button">
-							ログアウト
-						</button>
+					<div class="header-top">
+						<div class="logo">Suggestman</div>
+						<div class="user-info">
+							<span class="user-name">{user.name}</span>
+							<button class="logout-btn" onclick="handleLogout()" type="button">
+								ログアウト
+							</button>
+						</div>
+					</div>
+					<div class="header-welcome">
+						ようこそ、<strong>{user.name}さん</strong>。今日は何をしますか？
 					</div>
 				</div>
 
@@ -228,20 +282,34 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 						</div>
 					) : null}
 
-					<div class="welcome">
-						<h1>ようこそ、{user.name}さん</h1>
-						<p>今日は何をしますか？</p>
-					</div>
-
 					<div class="section">
 						<h2>提案を受け取る</h2>
+						<div id="suggestion-error" class="error-message" />
 						<button
+							id="suggestion-button"
 							class="suggestion-button"
-							onclick="alert('提案機能は開発中です')"
+							onclick="handleGetSuggestion()"
 							type="button"
 						>
 							今すぐ提案をもらう
 						</button>
+					</div>
+
+					<div id="suggestion-result" class="section" style="display: none;">
+						<h2>あなたへの提案</h2>
+						<div class="suggestion-card">
+							<h3
+								id="suggestion-title"
+								class="suggestion-title"
+								aria-label="提案タイトル"
+							/>
+							<p id="suggestion-message" class="suggestion-message" />
+							<div class="suggestion-details">
+								<div id="suggestion-tags" class="suggestion-tags" />
+								<div id="suggestion-time" class="suggestion-time" />
+							</div>
+							<div id="suggestion-note" class="suggestion-note" />
+						</div>
 					</div>
 
 					<div class="section">

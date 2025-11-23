@@ -6,12 +6,14 @@ import auth from "./routes/auth";
 import dashboard from "./routes/dashboard";
 import static_routes from "./routes/static";
 import ideas from "./routes/ideas";
+import suggestions from "./routes/suggestions";
 
 const app = new OpenAPIHono<{ Bindings: Bindings }>();
 
 app.route("/", index);
 app.route("/api/auth", auth);
 app.route("/api/ideas", ideas);
+app.route("/api/suggestions", suggestions);
 app.route("/dashboard", dashboard);
 app.route("/static", static_routes);
 

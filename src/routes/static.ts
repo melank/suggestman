@@ -52,6 +52,92 @@ async function handleSetPassword(e) {
 		error.textContent = 'パスワードの設定に失敗しました: ' + err.message;
 		error.classList.add('show');
 	}
+}
+
+async function handleGetSuggestion() {
+	const button = document.getElementById('suggestion-button');
+	const errorEl = document.getElementById('suggestion-error');
+	const resultEl = document.getElementById('suggestion-result');
+
+	// エラーメッセージをクリア
+	errorEl.classList.remove('show');
+	errorEl.textContent = '';
+
+	// ボタンを無効化
+	button.disabled = true;
+	button.textContent = '提案を取得中...';
+
+	try {
+		const res = await fetch('/api/suggestions', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			credentials: 'same-origin',
+			body: JSON.stringify({})
+		});
+
+		const data = await res.json();
+
+		if (res.ok) {
+			if (data.suggestion) {
+				// 提案がある場合、表示する
+				const idea = data.suggestion.idea;
+				document.getElementById('suggestion-title').textContent = idea.title;
+				document.getElementById('suggestion-message').textContent = data.suggestion.motivationalMessage;
+
+				// タグを表示
+				const tagsEl = document.getElementById('suggestion-tags');
+				tagsEl.innerHTML = '';
+				if (idea.tags && idea.tags.length > 0) {
+					idea.tags.forEach(tag => {
+						const tagEl = document.createElement('span');
+						tagEl.className = 'suggestion-tag';
+						tagEl.textContent = tag;
+						tagsEl.appendChild(tagEl);
+					});
+				}
+
+				// 推定時間を表示
+				const timeEl = document.getElementById('suggestion-time');
+				if (idea.estimated_minutes) {
+					timeEl.textContent = '⏱️ 約' + idea.estimated_minutes + '分';
+					timeEl.style.display = 'flex';
+				} else {
+					timeEl.style.display = 'none';
+				}
+
+				// メモを表示
+				const noteEl = document.getElementById('suggestion-note');
+				if (idea.note) {
+					noteEl.textContent = idea.note;
+					noteEl.style.display = 'block';
+				} else {
+					noteEl.style.display = 'none';
+				}
+
+				// 提案結果を表示
+				resultEl.style.display = 'block';
+				resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			} else {
+				// 提案がない場合
+				errorEl.textContent = data.message || 'アイデアが登録されていません';
+				errorEl.classList.add('show');
+				resultEl.style.display = 'none';
+			}
+		} else {
+			errorEl.textContent = data.error || '提案の取得に失敗しました';
+			errorEl.classList.add('show');
+			resultEl.style.display = 'none';
+		}
+	} catch (err) {
+		console.error('Suggestion error:', err);
+		errorEl.textContent = '提案の取得に失敗しました: ' + err.message;
+		errorEl.classList.add('show');
+		resultEl.style.display = 'none';
+	} finally {
+		// ボタンを再度有効化
+		button.disabled = false;
+		button.textContent = '今すぐ提案をもらう';
+	}
 }`;
 
 	return c.text(js, 200, {

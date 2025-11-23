@@ -17,6 +17,11 @@ export const IdeasListResponseSchema = z.object({
 	ideas: z.array(IdeaSchema),
 });
 
+// アイデア詳細レスポンス
+export const IdeaDetailResponseSchema = z.object({
+	idea: IdeaSchema,
+});
+
 // エラーレスポンス
 export const ErrorResponseSchema = z.object({
 	error: z.string(),
