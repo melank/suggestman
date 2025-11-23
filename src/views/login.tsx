@@ -162,7 +162,7 @@ export const LoginPage: FC = () => {
 						}
 					`}
 				</style>
-				<script src="/static/login.js"></script>
+				<script src="/static/login.js" />
 			</head>
 			<body>
 				<div class="container">

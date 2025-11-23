@@ -187,18 +187,14 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 						}
 					`}
 				</style>
-				<script src="/static/dashboard.js" defer></script>
+				<script src="/static/dashboard.js" defer />
 			</head>
 			<body>
 				<div class="header">
 					<div class="logo">Suggestman</div>
 					<div class="user-info">
 						<span class="user-name">{user.name}</span>
-						<button
-							class="logout-btn"
-							onclick="handleLogout()"
-							type="button"
-						>
+						<button class="logout-btn" onclick="handleLogout()" type="button">
 							ログアウト
 						</button>
 					</div>

@@ -154,13 +154,6 @@ sequenceDiagram
   2. `npm run lint` - リントチェック
 - リントエラーがある場合はコミットが中止されます
 
-**初回セットアップ:**
-```bash
-npm install
-npx husky init
-chmod +x .husky/pre-commit
-```
-
 **手動でスキップする場合（非推奨）:**
 ```bash
 git commit --no-verify -m "your message"

@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
-import {
-	generateJWT,
-	verifyJWT,
-	generateAccessToken,
-} from "../../src/lib/jwt";
+import { generateJWT, verifyJWT, generateAccessToken } from "../../src/lib/jwt";
 
 describe("JWT Utilities", () => {
 	const secret = "test-secret-key";
@@ -137,9 +133,10 @@ describe("JWT Utilities", () => {
 				encoder.encode(data),
 			);
 			const signatureBytes = new Uint8Array(signatureBuffer);
-			const signatureBase64 = btoa(
-				String.fromCharCode(...signatureBytes),
-			).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+			const signatureBase64 = btoa(String.fromCharCode(...signatureBytes))
+				.replace(/\+/g, "-")
+				.replace(/\//g, "_")
+				.replace(/=/g, "");
 
 			const token = `${data}.${signatureBase64}`;
 

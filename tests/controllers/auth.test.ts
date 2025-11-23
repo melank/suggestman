@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
-import { AuthController } from "../../src/controllers/auth";
 
-// Mock external dependencies
 jest.unstable_mockModule("../../src/lib/github", () => ({
 	getGitHubAccessToken: jest.fn(),
 	getGitHubUser: jest.fn(),
@@ -25,6 +23,7 @@ const { generateAccessToken, verifyJWT } = await import("../../src/lib/jwt");
 const { hashPassword, verifyPassword, validatePasswordStrength } = await import(
 	"../../src/lib/password"
 );
+const { AuthController } = await import("../../src/controllers/auth");
 
 describe("AuthController", () => {
 	beforeEach(() => {

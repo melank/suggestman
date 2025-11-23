@@ -179,19 +179,15 @@ export class AuthController {
 	 */
 	static async login(c: Context<{ Bindings: Bindings }>) {
 		try {
-			console.log("=== Login Debug ===");
 			const body = await c.req.json<{
 				email: string;
 				password: string;
 			}>();
 
 			const { email, password } = body;
-			console.log("Email:", email);
-			console.log("Password length:", password?.length);
 
 			// バリデーション
 			if (!email || !password) {
-				console.log("Validation failed: email or password missing");
 				return c.json({ error: "メールアドレスとパスワードは必須です" }, 400);
 			}
 
@@ -200,19 +196,15 @@ export class AuthController {
 				.bind(email)
 				.first();
 
-			console.log("User found:", !!user);
 			if (!user) {
-				console.log("User not found");
 				return c.json(
 					{ error: "メールアドレスまたはパスワードが正しくありません" },
 					401,
 				);
 			}
 
-			console.log("User has password_hash:", !!user.password_hash);
 			// password_hash が存在しない場合（GitHub OAuth のみのユーザー）
 			if (!user.password_hash) {
-				console.log("No password_hash");
 				return c.json(
 					{ error: "このアカウントは GitHub でログインしてください" },
 					401,
@@ -220,14 +212,11 @@ export class AuthController {
 			}
 
 			// パスワードを検証
-			console.log("Verifying password...");
 			const isValid = await verifyPassword(
 				password,
 				user.password_hash as string,
 			);
-			console.log("Password valid:", isValid);
 			if (!isValid) {
-				console.log("Password verification failed");
 				return c.json(
 					{ error: "メールアドレスまたはパスワードが正しくありません" },
 					401,
