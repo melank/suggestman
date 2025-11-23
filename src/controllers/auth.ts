@@ -7,6 +7,7 @@ import {
 	verifyPassword,
 	validatePasswordStrength,
 } from "../lib/password";
+import { UserRepository } from "../repositories/UserRepository";
 
 export class AuthController {
 	/**
@@ -46,40 +47,33 @@ export class AuthController {
 			const githubUser = await getGitHubUser(accessToken);
 
 			// データベースからユーザーを取得または作成
-			let user = await c.env.DB.prepare(
-				"SELECT * FROM users WHERE github_id = ?",
-			)
-				.bind(githubUser.id.toString())
-				.first();
+			const userRepository = new UserRepository(c.env.DB);
+			let user = await userRepository.findByGitHubId(githubUser.id.toString());
 
 			if (!user) {
 				// 新規ユーザー作成
 				const userId = crypto.randomUUID();
-				await c.env.DB.prepare(
-					"INSERT INTO users (id, email, name, github_id) VALUES (?, ?, ?, ?)",
-				)
-					.bind(
-						userId,
-						githubUser.email,
-						githubUser.name || githubUser.login,
-						githubUser.id.toString(),
-					)
-					.run();
-
-				user = {
+				const userName = githubUser.name || githubUser.login;
+				await userRepository.create({
 					id: userId,
 					email: githubUser.email,
-					name: githubUser.name || githubUser.login,
+					name: userName,
 					github_id: githubUser.id.toString(),
-				};
+				});
+
+				// 作成したユーザーを再取得
+				user = await userRepository.findByGitHubId(githubUser.id.toString());
+				if (!user) {
+					throw new Error("Failed to create user");
+				}
 			}
 
 			// JWT トークンを生成
 			const token = await generateAccessToken(
 				{
-					id: user.id as string,
-					email: user.email as string,
-					name: user.name as string,
+					id: user.id,
+					email: user.email,
+					name: user.name,
 				},
 				c.env.JWT_SECRET,
 			);
@@ -127,11 +121,8 @@ export class AuthController {
 			}
 
 			// 既存ユーザーチェック
-			const existingUser = await c.env.DB.prepare(
-				"SELECT * FROM users WHERE email = ?",
-			)
-				.bind(email)
-				.first();
+			const userRepository = new UserRepository(c.env.DB);
+			const existingUser = await userRepository.findByEmail(email);
 
 			if (existingUser) {
 				return c.json(
@@ -145,18 +136,19 @@ export class AuthController {
 
 			// ユーザーを作成
 			const userId = crypto.randomUUID();
-			await c.env.DB.prepare(
-				"INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)",
-			)
-				.bind(userId, email, name, passwordHash)
-				.run();
+			await userRepository.create({
+				id: userId,
+				email,
+				name,
+				password_hash: passwordHash,
+			});
 
 			// JWT トークンを生成
 			const token = await generateAccessToken(
 				{
 					id: userId,
-					email: email,
-					name: name,
+					email,
+					name,
 				},
 				c.env.JWT_SECRET,
 			);
@@ -192,9 +184,8 @@ export class AuthController {
 			}
 
 			// ユーザーを取得
-			const user = await c.env.DB.prepare("SELECT * FROM users WHERE email = ?")
-				.bind(email)
-				.first();
+			const userRepository = new UserRepository(c.env.DB);
+			const user = await userRepository.findByEmail(email);
 
 			if (!user) {
 				return c.json(
@@ -212,10 +203,7 @@ export class AuthController {
 			}
 
 			// パスワードを検証
-			const isValid = await verifyPassword(
-				password,
-				user.password_hash as string,
-			);
+			const isValid = await verifyPassword(password, user.password_hash);
 			if (!isValid) {
 				return c.json(
 					{ error: "メールアドレスまたはパスワードが正しくありません" },
@@ -226,9 +214,9 @@ export class AuthController {
 			// JWT トークンを生成
 			const token = await generateAccessToken(
 				{
-					id: user.id as string,
-					email: user.email as string,
-					name: user.name as string,
+					id: user.id,
+					email: user.email,
+					name: user.name,
 				},
 				c.env.JWT_SECRET,
 			);
@@ -295,9 +283,8 @@ export class AuthController {
 			const passwordHash = await hashPassword(password);
 
 			// ユーザーのパスワードを更新
-			await c.env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
-				.bind(passwordHash, payload.sub)
-				.run();
+			const userRepository = new UserRepository(c.env.DB);
+			await userRepository.updatePassword(payload.sub, passwordHash);
 
 			return c.json({ success: true, message: "パスワードが設定されました" });
 		} catch (error) {

@@ -77,15 +77,26 @@ describe("AuthController", () => {
 
 			const mockPrepare = (jest.fn() as any)
 				.mockReturnValueOnce({
-					// First call: SELECT user
+					// First call: SELECT user (findByGitHubId - user not found)
 					bind: (jest.fn() as any).mockReturnValue({
-						first: (jest.fn() as any).mockResolvedValue(null), // User not found
+						first: (jest.fn() as any).mockResolvedValue(null),
 					}),
 				})
 				.mockReturnValueOnce({
-					// Second call: INSERT user
+					// Second call: INSERT user (create)
 					bind: (jest.fn() as any).mockReturnValue({
 						run: (jest.fn() as any).mockResolvedValue({}),
+					}),
+				})
+				.mockReturnValueOnce({
+					// Third call: SELECT user again (findByGitHubId - user found after creation)
+					bind: (jest.fn() as any).mockReturnValue({
+						first: (jest.fn() as any).mockResolvedValue({
+							id: expect.any(String),
+							email: mockGitHubUser.email,
+							name: mockGitHubUser.name,
+							github_id: mockGitHubUser.id.toString(),
+						}),
 					}),
 				});
 

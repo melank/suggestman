@@ -70,10 +70,12 @@ describe("IdeasController", () => {
 				ideas: [
 					{
 						...mockIdeas[0],
+						user_id: "user-123",
 						tags: ["programming", "learning"],
 					},
 					{
 						...mockIdeas[1],
+						user_id: "user-123",
 						tags: [],
 					},
 				],

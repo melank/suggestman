@@ -25,13 +25,215 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 
 ### 主要コンポーネント
 - **ルート層** (`src/routes/`): Hono によるルーティング定義のみ（薄い層）
-- **Controller 層** (`src/controllers/`): リクエスト処理、レスポンス生成、バリデーション
+- **Controller 層** (`src/controllers/`): リクエスト処理、レスポンス生成、バリデーション（ビジネスロジックやDBアクセスは含まない）
 - **サービス層** (`src/services/`): ビジネスロジック、提案ロジック、フィルタリング
+- **リポジトリ層** (`src/repositories/`): データアクセス層（D1 データベースへのアクセスを抽象化）
 - **ストレージ層**: D1 によるアイデア管理、提案履歴
 
 ### エンドポイント設計
 
 未検討
+
+## リポジトリパターン
+
+### 概要
+
+**重要**: このプロジェクトでは、すべてのデータベースアクセスをリポジトリ層に集約します。Controller から直接 D1 データベースにアクセスすることは禁止されています。
+
+リポジトリパターンを採用することで、以下のメリットがあります：
+- **関心の分離**: データアクセスロジックとビジネスロジックを分離
+- **テスタビリティ**: データアクセス層を独立してテスト可能
+- **保守性**: データベーススキーマ変更時の影響範囲を最小化
+- **再利用性**: 複数の Controller や Service から同じリポジトリを利用可能
+
+### 既存のリポジトリ
+
+#### UserRepository (`src/repositories/UserRepository.ts`)
+ユーザー関連のデータアクセスを担当：
+
+**メソッド:**
+- `findByEmail(email: string): Promise<User | null>` - メールアドレスでユーザーを検索
+- `findByGitHubId(githubId: string): Promise<User | null>` - GitHub ID でユーザーを検索
+- `findById(id: string): Promise<User | null>` - ID でユーザーを検索
+- `create(userData: CreateUserData): Promise<void>` - 新規ユーザーを作成
+- `updatePassword(userId: string, passwordHash: string): Promise<void>` - パスワードを更新
+
+**使用例:**
+```typescript
+// Controller 内での使用例
+import { UserRepository } from '../repositories/UserRepository';
+
+const userRepository = new UserRepository(c.env.DB);
+const user = await userRepository.findByEmail(email);
+if (!user) {
+  return c.json({ error: 'ユーザーが見つかりません' }, 404);
+}
+```
+
+#### IdeaRepository (`src/repositories/IdeaRepository.ts`)
+アイデア関連のデータアクセスを担当：
+
+**メソッド:**
+- `findByUserId(userId: string): Promise<Idea[]>` - ユーザー ID でアイデア一覧を取得
+- `findById(id: string): Promise<Idea | null>` - ID でアイデアを取得
+
+**使用例:**
+```typescript
+// Controller 内での使用例
+import { IdeaRepository } from '../repositories/IdeaRepository';
+
+const ideaRepository = new IdeaRepository(c.env.DB);
+const ideas = await ideaRepository.findByUserId(userId);
+return c.json({ ideas });
+```
+
+### 新しいリポジトリの追加方法
+
+#### 1. リポジトリファイルの作成
+
+新しいエンティティ用のリポジトリを `src/repositories/` 配下に作成します：
+
+```typescript
+// src/repositories/SuggestionRepository.ts
+import type { D1Database } from "@cloudflare/workers-types";
+
+export interface Suggestion {
+  id: string;
+  user_id: string;
+  idea_id: string;
+  suggested_at: string;
+  // その他のフィールド
+}
+
+export class SuggestionRepository {
+  constructor(private db: D1Database) {}
+
+  /**
+   * ユーザーIDで提案履歴を取得
+   */
+  async findByUserId(userId: string): Promise<Suggestion[]> {
+    const { results } = await this.db
+      .prepare("SELECT * FROM suggestions WHERE user_id = ? ORDER BY suggested_at DESC")
+      .bind(userId)
+      .all<Suggestion>();
+    return results;
+  }
+
+  /**
+   * 新しい提案を記録
+   */
+  async create(suggestion: Omit<Suggestion, "id">): Promise<void> {
+    const id = crypto.randomUUID();
+    await this.db
+      .prepare("INSERT INTO suggestions (id, user_id, idea_id, suggested_at) VALUES (?, ?, ?, ?)")
+      .bind(id, suggestion.user_id, suggestion.idea_id, suggestion.suggested_at)
+      .run();
+  }
+}
+```
+
+**原則:**
+- リポジトリクラスは D1Database をコンストラクタで受け取る（依存性注入）
+- 各メソッドは単一責任を持つ（1メソッド = 1つのデータアクセス操作）
+- 型定義を export して他のファイルから利用可能にする
+- SQL クエリはリポジトリ内に閉じ込め、外部に漏らさない
+
+#### 2. テストファイルの作成
+
+すべてのリポジトリには対応するテストファイルを作成します：
+
+```typescript
+// tests/repositories/SuggestionRepository.test.ts
+import { describe, it, expect, jest } from "@jest/globals";
+import { SuggestionRepository } from "../../src/repositories/SuggestionRepository";
+
+describe("SuggestionRepository", () => {
+  describe("findByUserId", () => {
+    it("should return suggestions for user", async () => {
+      const mockResults = [
+        {
+          id: "suggestion-1",
+          user_id: "user-123",
+          idea_id: "idea-1",
+          suggested_at: "2024-01-01T00:00:00Z",
+        },
+      ];
+
+      const mockAll = (jest.fn() as any).mockResolvedValue({
+        results: mockResults,
+      });
+      const mockBind = (jest.fn() as any).mockReturnValue({ all: mockAll });
+      const mockPrepare = (jest.fn() as any).mockReturnValue({ bind: mockBind });
+
+      const mockDB: any = { prepare: mockPrepare };
+      const repository = new SuggestionRepository(mockDB);
+      const result = await repository.findByUserId("user-123");
+
+      expect(mockPrepare).toHaveBeenCalledWith(
+        "SELECT * FROM suggestions WHERE user_id = ? ORDER BY suggested_at DESC"
+      );
+      expect(result).toEqual(mockResults);
+    });
+  });
+});
+```
+
+**テストのポイント:**
+- D1Database をモックして、実際の DB 接続なしでテスト
+- SQL クエリが正しいパラメータで呼ばれているか確認
+- 戻り値の型と内容が期待通りか確認
+- エッジケース（null、空配列など）もテスト
+
+#### 3. Controller からの利用
+
+Controller では、リポジトリを経由してデータアクセスを行います：
+
+```typescript
+// src/controllers/suggestions.ts
+import type { Context } from "hono";
+import type { Bindings, JWTPayload } from "../types/bindings";
+import { SuggestionRepository } from "../repositories/SuggestionRepository";
+import { IdeaRepository } from "../repositories/IdeaRepository";
+
+export class SuggestionsController {
+  static async list(
+    c: Context<{ Bindings: Bindings; Variables: { user: JWTPayload } }>
+  ) {
+    const user = c.get("user");
+
+    try {
+      // リポジトリを使ってデータ取得
+      const suggestionRepository = new SuggestionRepository(c.env.DB);
+      const suggestions = await suggestionRepository.findByUserId(user.sub);
+
+      return c.json({ suggestions });
+    } catch (error) {
+      console.error("Failed to fetch suggestions:", error);
+      return c.json({ error: "提案履歴の取得に失敗しました" }, 500);
+    }
+  }
+}
+```
+
+**Controller の責務:**
+- リクエストパラメータの取得とバリデーション
+- リポジトリのインスタンス化（`new Repository(c.env.DB)`）
+- リポジトリメソッドの呼び出し
+- レスポンスの生成
+- エラーハンドリング
+
+**禁止事項:**
+- ❌ Controller から直接 `c.env.DB.prepare()` を呼ぶ
+- ❌ SQL クエリを Controller に記述する
+- ❌ データの変換ロジックを Controller に記述する（リポジトリで行う）
+
+### リポジトリ設計のベストプラクティス
+
+1. **単一責任の原則**: 1つのリポジトリは1つのエンティティ（テーブル）を担当
+2. **メソッド命名**: `find*`, `create`, `update`, `delete` などの一貫した命名
+3. **型安全性**: すべてのメソッドで TypeScript の型を活用
+4. **エラーハンドリング**: データベースエラーはリポジトリ内で適切に処理
+5. **テストカバレッジ**: すべてのリポジトリメソッドにテストを書く（100% カバレッジを目指す）
 
 ## 開発環境
 
@@ -76,10 +278,9 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 ```
 tests/
 ├── controllers/       # Controller 層のテスト
-│   ├── auth.test.ts
-│   └── home.test.ts
-├── services/          # サービス層のテスト（今後追加）
-└── lib/               # ユーティリティのテスト（今後追加）
+├── repositories/      # リポジトリ層のテスト
+├── services/          # サービス層のテスト
+└── lib/               # ユーティリティのテスト
 ```
 
 **重要**: Node.js/TypeScript プロジェクトのデファクトスタンダードに従い、テストは `src/__tests__/` ではなく、プロジェクトルートの `tests/` ディレクトリに配置します。
@@ -232,12 +433,13 @@ export default app
 ```
 
 ##### Controller ファイル
-リクエスト処理とレスポンス生成を実装:
+リクエスト処理とレスポンス生成を実装（リポジトリを使用）:
 
 ```typescript
 // src/controllers/ideas.ts
 import type { Context } from 'hono'
 import type { Bindings, JWTPayload } from '../types/bindings'
+import { IdeaRepository } from '../repositories/IdeaRepository'
 
 export class IdeasController {
   /**
@@ -250,13 +452,11 @@ export class IdeasController {
     const userId = user.sub
 
     try {
-      const { results } = await c.env.DB.prepare(
-        'SELECT * FROM ideas WHERE user_id = ? ORDER BY created_at DESC'
-      )
-        .bind(userId)
-        .all()
+      // リポジトリを使用してデータ取得
+      const ideaRepository = new IdeaRepository(c.env.DB)
+      const ideas = await ideaRepository.findByUserId(userId)
 
-      return c.json({ ideas: results })
+      return c.json({ ideas })
     } catch (error) {
       console.error('Failed to fetch ideas:', error)
       return c.json({ error: 'アイデアの取得に失敗しました' }, 500)
@@ -389,29 +589,12 @@ app.route("/static", static_routes);
 src/
 ├── index.ts          # エントリポイント（app.route() のみ）
 ├── routes/           # ルーティング定義のみ（薄い層）
-│   ├── index.tsx     # /, /health
-│   ├── auth.ts       # /api/auth/* のルート
-│   ├── dashboard.tsx # /dashboard のルート
-│   ├── static.ts     # /static/* (JavaScript ファイル配信)
-│   ├── ideas.ts      # /ideas/* のルート
-│   └── suggestions.ts # /suggestions/* のルート
-├── controllers/      # リクエスト処理とレスポンス生成
-│   ├── home.tsx      # ホームページ、ヘルスチェック
-│   ├── auth.ts       # 認証関連の処理
-│   └── ideas.ts      # アイデア管理の処理
+├── controllers/      # リクエスト処理とレスポンス生成（DBアクセス禁止）
+├── repositories/     # データアクセス層（DBアクセスはここに集約）
 ├── views/            # HTML ファイル (Hono JSX)
-│   ├── login.tsx
-│   └── dashboard.tsx
 ├── services/         # ビジネスロジック
-│   └── suggestion.ts
 ├── lib/              # ユーティリティ
-│   ├── jwt.ts
-│   ├── github.ts
-│   ├── password.ts
-│   └── middleware.ts
 └── types/            # 型定義
-    ├── bindings.ts
-    └── context.ts
 ```
 
 ### 命名規則
@@ -423,11 +606,58 @@ src/
 ## 開発タスク例
 
 ### 新しいエンドポイントの追加
-1. ルート定義を追加 (`src/routes/` 配下)
-2. サービスロジックを実装 (`src/services/` 配下)
-3. 型定義を更新 (`src/types/` 配下)
-4. ローカルで動作確認 (`npm run dev`)
-5. 型チェックと Lint を実行
+1. データベーススキーマが必要な場合はマイグレーションを作成
+2. リポジトリを作成/更新 (`src/repositories/` 配下)
+3. リポジトリのテストを作成 (`tests/repositories/` 配下)
+4. Controller を作成/更新 (`src/controllers/` 配下)
+5. ルート定義を追加 (`src/routes/` 配下)
+6. 必要に応じてサービスロジックを実装 (`src/services/` 配下)
+7. 型定義を更新 (`src/types/` 配下)
+8. Controller のテストを作成/更新 (`tests/controllers/` 配下)
+9. ローカルで動作確認 (`npm run dev`)
+10. すべてのテストが通ることを確認 (`npm test`)
+11. 型チェックと Lint を実行 (`npm run typecheck && npm run lint`)
+
+### リポジトリへの機能追加
+新しいデータアクセス操作が必要になった場合：
+
+1. **リポジトリメソッドを追加**
+   ```typescript
+   // src/repositories/IdeaRepository.ts
+   async findByTag(userId: string, tag: string): Promise<Idea[]> {
+     const { results } = await this.db
+       .prepare("SELECT * FROM ideas WHERE user_id = ? AND tags LIKE ?")
+       .bind(userId, `%${tag}%`)
+       .all<IdeaRow>();
+
+     return results.map(idea => ({
+       ...idea,
+       tags: idea.tags ? JSON.parse(idea.tags) : [],
+     }));
+   }
+   ```
+
+2. **テストを追加**
+   ```typescript
+   // tests/repositories/IdeaRepository.test.ts
+   describe("findByTag", () => {
+     it("should return ideas with specified tag", async () => {
+       // テストコードを記述
+     });
+   });
+   ```
+
+3. **Controller から利用**
+   ```typescript
+   // src/controllers/ideas.ts
+   const ideaRepository = new IdeaRepository(c.env.DB);
+   const ideas = await ideaRepository.findByTag(userId, tag);
+   ```
+
+4. **テストを実行して確認**
+   ```bash
+   npm test tests/repositories/IdeaRepository.test.ts
+   ```
 
 ### データベーススキーマの変更
 

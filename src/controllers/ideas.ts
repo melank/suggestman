@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import type { Bindings, JWTPayload } from "../types/bindings";
+import { IdeaRepository } from "../repositories/IdeaRepository";
 
 export class IdeasController {
 	/**
@@ -12,17 +13,8 @@ export class IdeasController {
 		const userId = user.sub;
 
 		try {
-			const { results } = await c.env.DB.prepare(
-				"SELECT id, title, tags, note, estimated_minutes, created_at, updated_at FROM ideas WHERE user_id = ? ORDER BY created_at DESC",
-			)
-				.bind(userId)
-				.all();
-
-			// タグのJSON文字列を配列にパース
-			const ideas = results.map((idea) => ({
-				...idea,
-				tags: idea.tags ? JSON.parse(idea.tags as string) : [],
-			}));
+			const ideaRepository = new IdeaRepository(c.env.DB);
+			const ideas = await ideaRepository.findByUserId(userId);
 
 			return c.json({ ideas });
 		} catch (error) {
