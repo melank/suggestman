@@ -1,12 +1,12 @@
 import type { Context } from "hono";
 import type { Bindings } from "../types/bindings";
-import { getGitHubAccessToken, getGitHubUser } from "../lib/github";
-import { generateAccessToken, verifyJWT } from "../lib/jwt";
+import { getGitHubAccessToken, getGitHubUser } from "../services/github";
+import { generateAccessToken, verifyJWT } from "../services/jwt";
 import {
 	hashPassword,
 	verifyPassword,
 	validatePasswordStrength,
-} from "../lib/password";
+} from "../services/password";
 import { UserRepository } from "../repositories/UserRepository";
 
 export class AuthController {

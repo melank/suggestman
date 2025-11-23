@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 // Mock jwt module BEFORE importing HomeController
-jest.unstable_mockModule("../../src/lib/jwt", () => ({
+jest.unstable_mockModule("../../src/services/jwt", () => ({
 	verifyJWT: jest.fn(),
 }));
 
@@ -11,7 +11,7 @@ jest.unstable_mockModule("../../src/views/login", () => ({
 }));
 
 // Import after mocking
-const { verifyJWT } = await import("../../src/lib/jwt");
+const { verifyJWT } = await import("../../src/services/jwt");
 const { HomeController } = await import("../../src/controllers/home");
 
 describe("HomeController", () => {

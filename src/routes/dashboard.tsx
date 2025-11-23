@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Bindings, JWTPayload } from "../types/bindings";
-import { authMiddleware } from "../lib/middleware";
+import { authMiddleware } from "../services/middleware";
 import { DashboardPage } from "../views/dashboard";
 
 const app = new Hono<{

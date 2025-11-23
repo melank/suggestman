@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
-import { generateJWT, verifyJWT, generateAccessToken } from "../../src/lib/jwt";
+import {
+	generateJWT,
+	verifyJWT,
+	generateAccessToken,
+} from "../../src/services/jwt";
 
 describe("JWT Utilities", () => {
 	const secret = "test-secret-key";

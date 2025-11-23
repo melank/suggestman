@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Bindings } from "../types/bindings";
 import { LoginPage } from "../views/login";
-import { verifyJWT } from "../lib/jwt";
+import { verifyJWT } from "../services/jwt";
 
 export class HomeController {
 	/**

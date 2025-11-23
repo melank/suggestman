@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { getGitHubAccessToken, getGitHubUser } from "../../src/lib/github";
+import { getGitHubAccessToken, getGitHubUser } from "../../src/services/github";
 
 // Mock global fetch
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;

@@ -3,13 +3,13 @@ import { Hono } from "hono";
 import type { Bindings } from "../../src/types/bindings";
 
 // Mock jwt module
-jest.unstable_mockModule("../../src/lib/jwt", () => ({
+jest.unstable_mockModule("../../src/services/jwt", () => ({
 	verifyJWT: jest.fn(),
 }));
 
 // Import after mocking
-const { authMiddleware } = await import("../../src/lib/middleware");
-const { verifyJWT } = await import("../../src/lib/jwt");
+const { authMiddleware } = await import("../../src/services/middleware");
+const { verifyJWT } = await import("../../src/services/jwt");
 
 describe("Auth Middleware", () => {
 	let app: Hono<{ Bindings: Bindings }>;

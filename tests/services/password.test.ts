@@ -3,7 +3,7 @@ import {
 	hashPassword,
 	verifyPassword,
 	validatePasswordStrength,
-} from "../../src/lib/password";
+} from "../../src/services/password";
 
 describe("Password Utilities", () => {
 	describe("hashPassword", () => {

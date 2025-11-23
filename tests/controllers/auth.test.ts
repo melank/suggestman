@@ -1,27 +1,29 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 
-jest.unstable_mockModule("../../src/lib/github", () => ({
+jest.unstable_mockModule("../../src/services/github", () => ({
 	getGitHubAccessToken: jest.fn(),
 	getGitHubUser: jest.fn(),
 }));
 
-jest.unstable_mockModule("../../src/lib/jwt", () => ({
+jest.unstable_mockModule("../../src/services/jwt", () => ({
 	generateAccessToken: jest.fn(),
 	verifyJWT: jest.fn(),
 }));
 
-jest.unstable_mockModule("../../src/lib/password", () => ({
+jest.unstable_mockModule("../../src/services/password", () => ({
 	hashPassword: jest.fn(),
 	verifyPassword: jest.fn(),
 	validatePasswordStrength: jest.fn(),
 }));
 
 const { getGitHubAccessToken, getGitHubUser } = await import(
-	"../../src/lib/github"
+	"../../src/services/github"
 );
-const { generateAccessToken, verifyJWT } = await import("../../src/lib/jwt");
+const { generateAccessToken, verifyJWT } = await import(
+	"../../src/services/jwt"
+);
 const { hashPassword, verifyPassword, validatePasswordStrength } = await import(
-	"../../src/lib/password"
+	"../../src/services/password"
 );
 const { AuthController } = await import("../../src/controllers/auth");
 
