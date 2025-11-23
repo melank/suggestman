@@ -128,22 +128,3 @@ export async function generateAccessToken(
 		3600, // 1時間
 	);
 }
-
-// Refresh Token の生成（30日間有効）
-export async function generateRefreshToken(
-	userId: string,
-	sessionId: string,
-	secret: string,
-): Promise<string> {
-	return generateJWT(
-		{
-			sub: userId,
-			email: "", // Refresh token には含めない
-			name: "", // Refresh token には含めない
-			type: "refresh",
-			sessionId,
-		},
-		secret,
-		2592000, // 30日間
-	);
-}

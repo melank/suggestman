@@ -67,6 +67,7 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - **Linter/Formatter**: Biome を使用
 - コミット前に `npm run format` と `npm run lint` を実行
 - 型定義は厳密に（`strict: true`）
+- **個人情報の禁止**: コード、コメント、seed データに個人情報（メールアドレス、電話番号、住所など）を含めない。もしくは架空の情報や個人に紐づかないものとする（メールアドレスや電話番号は利用されているものは許容しない、住所も公共物に限定する）
 
 ### ファイル構成の原則
 - **index.ts はコンパクトに**: エントリポイントとして `app.route()` でのルートマウントのみを行う
@@ -252,6 +253,21 @@ src/
 5. 型チェックと Lint を実行
 
 ### データベーススキーマの変更
+
+#### マイグレーションファイルの命名規則
+- **テーブル作成**: `NNNN_create_<table_name>_table.sql`
+  - 例: `0001_create_users_table.sql`, `0002_create_ideas_table.sql`
+- **カラム追加**: `NNNN_add_<column_name>_to_<table_name>_table.sql`
+  - 例: `0003_add_avatar_url_to_users_table.sql`
+- **その他の変更**: 変更内容が明確にわかる名前を付ける
+  - 例: `0004_add_index_to_ideas_title.sql`
+
+#### マイグレーションファイルの原則
+- **1ファイル1テーブル**: 一つのマイグレーションファイルで複数のテーブルを操作しない
+  - ただし、関連テーブル（例: users と sessions）は同一ファイルに含めてもよい
+- **わかりやすい命名**: `init` のような抽象的な名前は避け、何をするかがファイル名から明確にわかるようにする
+
+#### 変更手順
 1. マイグレーションファイルを作成 (`migrations/` 配下)
 2. ローカルで適用: `npx wrangler d1 migrations apply suggestman --local`
 3. 動作確認
