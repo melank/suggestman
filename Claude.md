@@ -11,6 +11,8 @@ Suggestman は、自由時間が突然生まれた瞬間に「本当にやりた
 ### 技術スタック
 - **Runtime**: Cloudflare Workers
 - **Framework**: Hono v4
+- **API Validation**: Zod + @hono/zod-openapi
+- **API Documentation**: Swagger UI (@hono/swagger-ui)
 - **Database**: Cloudflare D1 (SQLite)
 - **Language**: TypeScript
 - **Linter/Formatter**: Biome
@@ -24,10 +26,172 @@ Client → Cloudflare Workers (Hono) → Service Layer → Repository Layer → 
 ```
 
 ### 主要コンポーネント
-- **ルート層** (`src/routes/`): Hono によるルーティング定義とリクエストハンドラ
+- **ルート層** (`src/routes/`): Hono によるルーティング定義とリクエストハンドラ（OpenAPI 形式）
+- **スキーマ層** (`src/schemas/`): Zod によるリクエスト/レスポンスの型定義とバリデーション
 - **サービス層** (`src/services/`): ビジネスロジック、提案ロジック、フィルタリング
 - **リポジトリ層** (`src/repositories/`): データアクセス層（D1 データベースへのアクセスを抽象化）
 - **ストレージ層**: D1 によるアイデア管理、提案履歴
+
+## OpenAPI + Zod による型安全な API
+
+このプロジェクトでは、**Zod** と **@hono/zod-openapi** を使用して、型安全かつドキュメント化された API を構築しています。
+
+### メリット
+
+1. **型安全なバリデーション**: リクエストボディが Zod で自動検証される
+2. **OpenAPI 仕様の自動生成**: `/openapi.json` で API 仕様を確認可能
+3. **Swagger UI の提供**: `/docs` でインタラクティブな API ドキュメント
+4. **ドキュメントとコードの一致**: スキーマが常に最新
+
+### ディレクトリ構造
+
+```
+src/
+├── schemas/          # Zod スキーマ定義
+│   ├── auth.ts       # 認証 API のスキーマ
+│   └── ideas.ts      # アイデア API のスキーマ
+├── routes/           # OpenAPI ルート定義
+│   ├── auth.ts       # 認証エンドポイント
+│   └── ideas.ts      # アイデアエンドポイント
+└── index.ts          # OpenAPI ドキュメント設定
+```
+
+### Zod スキーマの作成
+
+すべてのリクエスト/レスポンスの型を Zod で定義します：
+
+```typescript
+// src/schemas/auth.ts
+import { z } from "zod";
+
+export const LoginRequestSchema = z.object({
+  email: z.string().email("有効なメールアドレスを入力してください"),
+  password: z.string().min(1, "パスワードは必須です"),
+});
+
+export const LoginResponseSchema = z.object({
+  success: z.boolean(),
+  redirect: z.string(),
+});
+
+export const ErrorResponseSchema = z.object({
+  error: z.string(),
+  details: z.string().optional(),
+});
+```
+
+### OpenAPI ルートの定義
+
+`createRoute()` でルート定義を作成し、`app.openapi()` でハンドラを登録：
+
+```typescript
+// src/routes/auth.ts
+import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
+import { LoginRequestSchema, LoginResponseSchema, ErrorResponseSchema } from "../schemas/auth";
+
+const app = new OpenAPIHono<{ Bindings: Bindings }>();
+
+const loginRoute = createRoute({
+  method: "post",
+  path: "/login",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: LoginRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: LoginResponseSchema,
+        },
+      },
+      description: "ログイン成功",
+    },
+    401: {
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+      description: "認証失敗",
+    },
+  },
+});
+
+app.openapi(loginRoute, async (c) => {
+  // c.req.valid("json") で型安全に取得
+  const { email, password } = c.req.valid("json");
+
+  // ビジネスロジック...
+
+  // ステータスコードを明示的に指定
+  return c.json({ success: true, redirect: "/dashboard" }, 200);
+});
+```
+
+### 重要なポイント
+
+#### 1. ステータスコードの明示
+
+OpenAPI では、各レスポンスのステータスコードを明示する必要があります：
+
+```typescript
+// ❌ ステータスコードなし（型エラー）
+return c.json({ success: true });
+
+// ✅ ステータスコードを明示
+return c.json({ success: true }, 200);
+```
+
+#### 2. スキーマと DB 型の一致
+
+Zod スキーマは実際のデータベーススキーマと一致させる必要があります：
+
+```typescript
+// DB の型が { note?: string | null } の場合
+export const IdeaSchema = z.object({
+  note: z.string().nullish(),  // undefined | null | string
+});
+```
+
+#### 3. 環境変数ベースの OpenAPI ドキュメント
+
+本番環境では `API_BASE_URL` 環境変数を設定：
+
+```typescript
+// src/index.ts
+app.doc31("/openapi.json", (c) => {
+  const serverUrl = c.env.API_BASE_URL || new URL(c.req.url).origin;
+
+  return {
+    openapi: "3.1.0",
+    info: { /* ... */ },
+    servers: [{ url: serverUrl }],
+  };
+});
+```
+
+### API ドキュメントへのアクセス
+
+- **Swagger UI**: http://localhost:8787/docs
+- **OpenAPI JSON**: http://localhost:8787/openapi.json
+
+### 本番環境での設定
+
+Cloudflare Workers に環境変数を設定：
+
+```bash
+# wrangler CLI
+wrangler secret put API_BASE_URL
+# 入力: https://api.suggestman.com
+
+# または Cloudflare Dashboard で設定
+```
 
 ### 🚫 Hono ベストプラクティス - Controller パターンの禁止
 

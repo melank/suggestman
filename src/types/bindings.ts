@@ -11,6 +11,9 @@ export type Bindings = {
 
 	// Environment name (development | production)
 	ENVIRONMENT?: string;
+
+	// API Base URL for OpenAPI documentation (production only)
+	API_BASE_URL?: string;
 };
 
 // JWT Payload の型定義
