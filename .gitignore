@@ -21,6 +21,10 @@ build/
 # TypeScript
 *.tsbuildinfo
 
+# Test coverage
+coverage/
+*.lcov
+
 # Local tooling caches
 .eslintcache
 .turbo/
