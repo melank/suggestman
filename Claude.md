@@ -61,6 +61,107 @@ Client → Cloudflare Workers (Hono) → Suggestion Service → D1 Storage
 - `npm run lint`: Biome による Lint チェック
 - `npm run format`: Biome による自動フォーマット
 - `npm run typecheck`: TypeScript 型チェック
+- `npm test`: Jest によるテスト実行
+- `npm run test:watch`: Jest のウォッチモード
+- `npm run test:coverage`: カバレッジレポート生成
+
+## テスト
+
+### テストフレームワーク
+- **テストランナー**: Jest v30 + ts-jest
+- **テスト環境**: Node.js (ESM モード)
+- **テスト配置**: `tests/` ディレクトリ（プロジェクトルート直下）
+
+### ディレクトリ構造
+```
+tests/
+├── controllers/       # Controller 層のテスト
+│   ├── auth.test.ts
+│   └── home.test.ts
+├── services/          # サービス層のテスト（今後追加）
+└── lib/               # ユーティリティのテスト（今後追加）
+```
+
+**重要**: Node.js/TypeScript プロジェクトのデファクトスタンダードに従い、テストは `src/__tests__/` ではなく、プロジェクトルートの `tests/` ディレクトリに配置します。
+
+### テストファイルの命名規則
+- テストファイル名: `<対象ファイル名>.test.ts`
+- 例: `auth.ts` のテストは `auth.test.ts`
+
+### テストの作成方法
+
+#### 基本構造
+```typescript
+import { describe, it, expect, jest } from "@jest/globals";
+import type { Context } from "hono";
+import type { Bindings } from "../../src/types/bindings";
+import { AuthController } from "../../src/controllers/auth";
+
+describe("AuthController", () => {
+  describe("logout", () => {
+    it("should set cookie with Max-Age=0 and redirect to /", async () => {
+      const mockContext = {
+        header: jest.fn(),
+        redirect: jest.fn((url: string) => ({
+          status: 302,
+          headers: new Headers({ Location: url }),
+        })),
+      } as unknown as Context<{ Bindings: Bindings }>;
+
+      await AuthController.logout(mockContext);
+
+      expect(mockContext.header).toHaveBeenCalledWith(
+        "Set-Cookie",
+        "token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+      );
+      expect(mockContext.redirect).toHaveBeenCalledWith("/");
+    });
+  });
+});
+```
+
+#### インポートパスの注意点
+`tests/` ディレクトリから `src/` のファイルを参照する場合:
+```typescript
+// ❌ 誤り
+import { AuthController } from "../../controllers/auth";
+
+// ✅ 正しい
+import { AuthController } from "../../src/controllers/auth";
+```
+
+### テスト実行
+```bash
+# すべてのテストを実行
+npm test
+
+# 特定のテストファイルのみ実行
+npm test tests/controllers/auth.test.ts
+
+# ウォッチモードで実行
+npm run test:watch
+
+# カバレッジレポート生成
+npm run test:coverage
+```
+
+### モック戦略
+- **Hono Context**: `jest.fn()` を使用して必要なメソッドのみモック
+- **D1 Database**: テスト用のモックを作成（統合テストでは in-memory SQLite を検討）
+- **外部 API**: `jest.mock()` を使用してモジュール全体をモック
+
+### 既知の問題
+- **ESM 依存関係の問題**: 一部のコントローラー（例: HomeController）は `jwt.ts` などの ESM モジュールをインポートしており、Jest の ESM サポートの制限により現在テストが失敗します。
+- **回避策**:
+  - 外部依存が少ないシンプルなコントローラー（例: AuthController）を優先的にテスト
+  - 今後、Jest の ESM サポートが改善された際に修正予定
+
+### テストのベストプラクティス
+- **デグレード防止**: 機能追加や修正を行う際は、必ずテストを書く
+- **テストカバレッジ**: 重要なビジネスロジックは 80% 以上のカバレッジを目指す
+- **テスト駆動開発**: 可能な限り、実装前にテストを書く（TDD）
+- **テストの独立性**: 各テストは独立して実行可能であること
+- **モックの最小化**: 必要最小限のモックに留め、実際の動作に近い状態でテスト
 
 ## コーディング規約
 
