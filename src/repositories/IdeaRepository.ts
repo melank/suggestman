@@ -5,7 +5,6 @@ export interface Idea {
 	user_id: string;
 	title: string;
 	tags: string[];
-	note?: string | null;
 	estimated_minutes?: number | null;
 	created_at: string;
 	updated_at: string;
@@ -16,7 +15,6 @@ interface IdeaRow {
 	user_id: string;
 	title: string;
 	tags: string;
-	note?: string | null;
 	estimated_minutes?: number | null;
 	created_at: string;
 	updated_at: string;
@@ -31,7 +29,7 @@ export class IdeaRepository {
 	async findByUserId(userId: string): Promise<Idea[]> {
 		const { results } = await this.db
 			.prepare(
-				"SELECT id, title, tags, note, estimated_minutes, created_at, updated_at FROM ideas WHERE user_id = ? ORDER BY created_at DESC",
+				"SELECT id, title, tags, estimated_minutes, created_at, updated_at FROM ideas WHERE user_id = ? ORDER BY created_at DESC",
 			)
 			.bind(userId)
 			.all<IdeaRow>();

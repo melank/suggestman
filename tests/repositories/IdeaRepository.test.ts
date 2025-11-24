@@ -9,7 +9,6 @@ describe("IdeaRepository", () => {
 					id: "idea-1",
 					title: "Learn TypeScript",
 					tags: '["programming","learning"]',
-					note: "Study TS handbook",
 					estimated_minutes: 60,
 					created_at: "2024-01-01T00:00:00Z",
 					updated_at: "2024-01-01T00:00:00Z",
@@ -18,7 +17,6 @@ describe("IdeaRepository", () => {
 					id: "idea-2",
 					title: "Write blog post",
 					tags: null,
-					note: "About testing",
 					estimated_minutes: 30,
 					created_at: "2024-01-02T00:00:00Z",
 					updated_at: "2024-01-02T00:00:00Z",
@@ -43,7 +41,7 @@ describe("IdeaRepository", () => {
 			const result = await repository.findByUserId("user-123");
 
 			expect(mockPrepare).toHaveBeenCalledWith(
-				"SELECT id, title, tags, note, estimated_minutes, created_at, updated_at FROM ideas WHERE user_id = ? ORDER BY created_at DESC",
+				"SELECT id, title, tags, estimated_minutes, created_at, updated_at FROM ideas WHERE user_id = ? ORDER BY created_at DESC",
 			);
 			expect(mockBind).toHaveBeenCalledWith("user-123");
 			expect(result).toEqual([
@@ -52,7 +50,6 @@ describe("IdeaRepository", () => {
 					user_id: "user-123",
 					title: "Learn TypeScript",
 					tags: ["programming", "learning"],
-					note: "Study TS handbook",
 					estimated_minutes: 60,
 					created_at: "2024-01-01T00:00:00Z",
 					updated_at: "2024-01-01T00:00:00Z",
@@ -62,7 +59,6 @@ describe("IdeaRepository", () => {
 					user_id: "user-123",
 					title: "Write blog post",
 					tags: [],
-					note: "About testing",
 					estimated_minutes: 30,
 					created_at: "2024-01-02T00:00:00Z",
 					updated_at: "2024-01-02T00:00:00Z",
@@ -97,7 +93,6 @@ describe("IdeaRepository", () => {
 					id: "idea-1",
 					title: "Simple idea",
 					tags: null,
-					note: null,
 					estimated_minutes: null,
 					created_at: "2024-01-01T00:00:00Z",
 					updated_at: "2024-01-01T00:00:00Z",
@@ -132,7 +127,6 @@ describe("IdeaRepository", () => {
 				user_id: "user-123",
 				title: "Learn TypeScript",
 				tags: '["programming","learning"]',
-				note: "Study TS handbook",
 				estimated_minutes: 60,
 				created_at: "2024-01-01T00:00:00Z",
 				updated_at: "2024-01-01T00:00:00Z",
@@ -162,7 +156,6 @@ describe("IdeaRepository", () => {
 				user_id: "user-123",
 				title: "Learn TypeScript",
 				tags: ["programming", "learning"],
-				note: "Study TS handbook",
 				estimated_minutes: 60,
 				created_at: "2024-01-01T00:00:00Z",
 				updated_at: "2024-01-01T00:00:00Z",
@@ -194,7 +187,6 @@ describe("IdeaRepository", () => {
 				user_id: "user-123",
 				title: "Simple idea",
 				tags: null,
-				note: null,
 				estimated_minutes: null,
 				created_at: "2024-01-01T00:00:00Z",
 				updated_at: "2024-01-01T00:00:00Z",
