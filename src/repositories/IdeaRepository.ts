@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 export interface Idea {
-	id: string;
+	id: number;
 	user_id: string;
 	title: string;
 	tags: string[];
@@ -11,7 +11,7 @@ export interface Idea {
 }
 
 interface IdeaRow {
-	id: string;
+	id: number;
 	user_id: string;
 	title: string;
 	tags: string;
@@ -45,7 +45,7 @@ export class IdeaRepository {
 	/**
 	 * IDでアイデアを取得
 	 */
-	async findById(id: string): Promise<Idea | null> {
+	async findById(id: number): Promise<Idea | null> {
 		const row = await this.db
 			.prepare("SELECT * FROM ideas WHERE id = ?")
 			.bind(id)

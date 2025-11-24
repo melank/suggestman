@@ -114,6 +114,10 @@ async function handleGetSuggestion() {
 					noteEl.style.display = 'none';
 				}
 
+				// 採用ボタンにアイデアIDを設定
+				const adoptButton = document.getElementById('adopt-button');
+				adoptButton.setAttribute('data-idea-id', idea.id);
+
 				// 提案結果を表示
 				resultEl.style.display = 'block';
 				resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -137,6 +141,59 @@ async function handleGetSuggestion() {
 		// ボタンを再度有効化
 		button.disabled = false;
 		button.textContent = '今すぐ提案をもらう';
+	}
+}
+
+async function handleAdoptIdea() {
+	const adoptButton = document.getElementById('adopt-button');
+	const ideaIdStr = adoptButton.getAttribute('data-idea-id');
+
+	if (!ideaIdStr) {
+		alert('アイデアIDが見つかりません');
+		return;
+	}
+
+	// 文字列を数値に変換
+	const ideaId = Number.parseInt(ideaIdStr, 10);
+	if (Number.isNaN(ideaId)) {
+		alert('無効なアイデアIDです');
+		return;
+	}
+
+	// ボタンを無効化
+	adoptButton.disabled = true;
+	adoptButton.textContent = '採用中...';
+
+	try {
+		const res = await fetch('/api/adopted-ideas', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			credentials: 'same-origin',
+			body: JSON.stringify({ idea_id: ideaId })
+		});
+
+		const data = await res.json();
+
+		if (res.ok) {
+			adoptButton.textContent = '✓ 採用済み';
+			adoptButton.style.background = 'rgba(76, 175, 80, 0.3)';
+			adoptButton.style.color = 'white';
+			setTimeout(() => {
+				adoptButton.disabled = false;
+				adoptButton.textContent = '採用する';
+				adoptButton.style.background = 'white';
+				adoptButton.style.color = '#FFB347';
+			}, 2000);
+		} else {
+			alert(data.error || 'アイデアの採用に失敗しました');
+			adoptButton.disabled = false;
+			adoptButton.textContent = '採用する';
+		}
+	} catch (err) {
+		console.error('Adopt idea error:', err);
+		alert('アイデアの採用に失敗しました: ' + err.message);
+		adoptButton.disabled = false;
+		adoptButton.textContent = '採用する';
 	}
 }`;
 

@@ -58,7 +58,7 @@ const getIdeaRoute = createRoute({
 	path: "/{id}",
 	request: {
 		params: z.object({
-			id: z.string().min(1, "アイデアIDは必須です"),
+			id: z.coerce.number().int().positive("アイデアIDは必須です"),
 		}),
 	},
 	responses: {

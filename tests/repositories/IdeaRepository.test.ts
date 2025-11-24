@@ -6,7 +6,7 @@ describe("IdeaRepository", () => {
 		it("should return ideas with parsed tags", async () => {
 			const mockResults = [
 				{
-					id: "idea-1",
+					id: 1,
 					title: "Learn TypeScript",
 					tags: '["programming","learning"]',
 					estimated_minutes: 60,
@@ -14,7 +14,7 @@ describe("IdeaRepository", () => {
 					updated_at: "2024-01-01T00:00:00Z",
 				},
 				{
-					id: "idea-2",
+					id: 2,
 					title: "Write blog post",
 					tags: null,
 					estimated_minutes: 30,
@@ -46,7 +46,7 @@ describe("IdeaRepository", () => {
 			expect(mockBind).toHaveBeenCalledWith("user-123");
 			expect(result).toEqual([
 				{
-					id: "idea-1",
+					id: 1,
 					user_id: "user-123",
 					title: "Learn TypeScript",
 					tags: ["programming", "learning"],
@@ -55,7 +55,7 @@ describe("IdeaRepository", () => {
 					updated_at: "2024-01-01T00:00:00Z",
 				},
 				{
-					id: "idea-2",
+					id: 2,
 					user_id: "user-123",
 					title: "Write blog post",
 					tags: [],
@@ -90,7 +90,7 @@ describe("IdeaRepository", () => {
 		it("should handle ideas with null tags", async () => {
 			const mockResults = [
 				{
-					id: "idea-1",
+					id: 1,
 					title: "Simple idea",
 					tags: null,
 					estimated_minutes: null,
@@ -123,7 +123,7 @@ describe("IdeaRepository", () => {
 	describe("findById", () => {
 		it("should return idea with parsed tags when found", async () => {
 			const mockIdea = {
-				id: "idea-1",
+				id: 1,
 				user_id: "user-123",
 				title: "Learn TypeScript",
 				tags: '["programming","learning"]',
@@ -145,14 +145,14 @@ describe("IdeaRepository", () => {
 			};
 
 			const repository = new IdeaRepository(mockDB);
-			const result = await repository.findById("idea-1");
+			const result = await repository.findById(1);
 
 			expect(mockPrepare).toHaveBeenCalledWith(
 				"SELECT * FROM ideas WHERE id = ?",
 			);
-			expect(mockBind).toHaveBeenCalledWith("idea-1");
+			expect(mockBind).toHaveBeenCalledWith(1);
 			expect(result).toEqual({
-				id: "idea-1",
+				id: 1,
 				user_id: "user-123",
 				title: "Learn TypeScript",
 				tags: ["programming", "learning"],
@@ -176,14 +176,14 @@ describe("IdeaRepository", () => {
 			};
 
 			const repository = new IdeaRepository(mockDB);
-			const result = await repository.findById("nonexistent-id");
+			const result = await repository.findById(999);
 
 			expect(result).toBeNull();
 		});
 
 		it("should handle ideas with null tags", async () => {
 			const mockIdea = {
-				id: "idea-1",
+				id: 1,
 				user_id: "user-123",
 				title: "Simple idea",
 				tags: null,
@@ -205,7 +205,7 @@ describe("IdeaRepository", () => {
 			};
 
 			const repository = new IdeaRepository(mockDB);
-			const result = await repository.findById("idea-1");
+			const result = await repository.findById(1);
 
 			expect(result?.tags).toEqual([]);
 		});

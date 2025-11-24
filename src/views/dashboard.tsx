@@ -185,6 +185,7 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 							padding: 2rem;
 							border-radius: 1rem;
 							box-shadow: 0 4px 12px rgba(255, 179, 71, 0.3);
+							position: relative;
 						}
 						.suggestion-title {
 							font-size: 1.8rem;
@@ -233,6 +234,27 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 							background: #ccc;
 							cursor: not-allowed;
 							transform: none;
+						}
+						.adopt-button {
+							position: absolute;
+							top: 1rem;
+							right: 1rem;
+							padding: 0.75rem 1.5rem;
+							background: white;
+							color: #FFB347;
+							border: 2px solid white;
+							border-radius: 0.5rem;
+							font-size: 1rem;
+							font-weight: 600;
+							cursor: pointer;
+							transition: background 0.2s, color 0.2s;
+						}
+						.adopt-button:hover {
+							background: rgba(255, 255, 255, 0.9);
+						}
+						.adopt-button:disabled {
+							background: rgba(255, 255, 255, 0.5);
+							cursor: not-allowed;
 						}
 					`}
 				</style>
@@ -298,6 +320,15 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 					<div id="suggestion-result" class="section" style="display: none;">
 						<h2>あなたへの提案</h2>
 						<div class="suggestion-card">
+							<button
+								id="adopt-button"
+								class="adopt-button"
+								onclick="handleAdoptIdea()"
+								type="button"
+								data-idea-id=""
+							>
+								採用する
+							</button>
 							<h3
 								id="suggestion-title"
 								class="suggestion-title"
@@ -310,11 +341,6 @@ export const DashboardPage: FC<DashboardPageProps> = ({
 							</div>
 							<div id="suggestion-note" class="suggestion-note" />
 						</div>
-					</div>
-
-					<div class="section">
-						<h2>最近のアイデア</h2>
-						<div class="placeholder">まだアイデアが登録されていません</div>
 					</div>
 				</div>
 			</body>

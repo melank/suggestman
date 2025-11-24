@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // アイデア（ideas テーブル）
 export const IdeaSchema = z.object({
-	id: z.string(),
+	id: z.number(),
 	user_id: z.string(),
 	title: z.string(),
 	tags: z.array(z.string()),
@@ -21,8 +21,8 @@ export const AdoptedIdeaStatusSchema = z.enum([
 
 // 採用されたアイデア（adopted_ideas テーブル）
 export const AdoptedIdeaSchema = z.object({
-	id: z.string(),
-	idea_id: z.string(),
+	id: z.number(),
+	idea_id: z.number(),
 	user_id: z.string(),
 	status: AdoptedIdeaStatusSchema,
 	note: z.string().nullish(),
@@ -45,7 +45,7 @@ export const IdeaDetailResponseSchema = z.object({
 
 // アイデア採用リクエスト
 export const AdoptIdeaRequestSchema = z.object({
-	idea_id: z.string().min(1, "アイデアIDは必須です"),
+	idea_id: z.number().int().positive("アイデアIDは必須です"),
 	note: z.string().optional(),
 });
 
